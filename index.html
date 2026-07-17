@@ -492,27 +492,35 @@
     <div class="brand" style="justify-content:center;margin-bottom:16px">
       <div class="logo">أ</div><div><h1>مشروع أثر</h1><small>تسجيل الدخول</small></div>
     </div>
-    <label>الاسم</label><input id="lg-name" placeholder="اكتب اسمك">
-    <label style="margin-top:10px">الدور</label>
-    <select id="lg-role"><option value="admin">مدير</option><option value="employee">موظف</option><option value="secretary">سكرتير</option></select>
-    <div id="lg-pass-wrap" style="display:none"><label style="margin-top:10px">رمز الدخول</label><input id="lg-pass" type="password" placeholder="الرمز"></div>
+    <label>البريد الإلكتروني</label><input id="lg-email" type="email" placeholder="you@example.com" autocomplete="username">
+    <label style="margin-top:10px">كلمة المرور</label><input id="lg-pass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="btn" style="width:100%;margin-top:16px" onclick="doLogin()">دخول</button>
     <p id="lg-err" style="color:#ff8a8a;font-size:12.5px;margin:10px 0 0;min-height:16px"></p>
-    <p style="font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.7">⚠️ نظام صلاحيات تنظيمي مؤقت (غير آمن) — سيُستبدل بتسجيل دخول حقيقي عبر Firebase عند الاستضافة.</p>
+    <p style="font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.7">🔐 تسجيل دخول آمن عبر Firebase. حسابات الموظفين يُنشئها المدير.</p>
   </div>
 </div>
 
 <!-- Access editor overlay (admin) -->
 <div id="access-ov" class="ov" style="display:none">
   <div class="ov-box" style="max-width:560px">
-    <h3 style="margin:0 0 4px">🔑 إدارة الصلاحيات</h3>
-    <p style="font-size:12px;color:var(--muted);margin:0 0 14px">حدّد الأقسام المسموحة لكل دور، ويمكنك ضبط رمز دخول لكل دور (اختياري).</p>
+    <h3 style="margin:0 0 4px">🔑 إدارة الموظفين والأدوار</h3>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 14px">عيّن دور كل موظف (مدير/موظف/سكرتير). المالك مدير دائمًا.</p>
     <div id="access-grid"></div>
-    <div class="toolbar"><button class="btn" onclick="saveAccess()">💾 حفظ</button><button class="btn ghost sm" onclick="closeAccess()">إغلاق</button></div>
+    <div class="toolbar"><button class="btn ghost sm" onclick="closeAccess()">إغلاق</button></div>
   </div>
 </div>
 
+<!-- Firebase SDK (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
 <script>
+/* ---- Firebase init ---- */
+const firebaseConfig={apiKey:"AIzaSyAOD5VhRc6s4eZHyeOKMiWDYYJG6dVYBlE",authDomain:"athar-dashboard.firebaseapp.com",projectId:"athar-dashboard",storageBucket:"athar-dashboard.firebasestorage.app",messagingSenderId:"509007437620",appId:"1:509007437620:web:391363cc87ab9f47488f61"};
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth(), fdb=firebase.firestore();
+const OWNER_EMAIL='s.999.alansary@gmail.com';
 const DB={
   get:(k)=>JSON.parse(localStorage.getItem('athar_'+k)||'[]'),
   set:(k,v)=>localStorage.setItem('athar_'+k,JSON.stringify(v))
@@ -1263,20 +1271,14 @@ const SECTIONS=[
 ];
 const ROLES=[{k:'admin',n:'مدير'},{k:'employee',n:'موظف'},{k:'secretary',n:'سكرتير'}];
 const ACCESS_DEFAULT={ admin:SECTIONS.map(s=>s.v), employee:['home','marketing','design','agenda'], secretary:['home','secretary','agenda','design'] };
-function accGet(){ try{const d=JSON.parse(localStorage.getItem('athar_access')); if(d&&d.admin)return d;}catch(e){} return JSON.parse(JSON.stringify(ACCESS_DEFAULT)); }
-function accSet(d){ localStorage.setItem('athar_access',JSON.stringify(d)); }
-function passGet(){ try{return JSON.parse(localStorage.getItem('athar_pass'))||{};}catch(e){return {};} }
-function passSet(d){ localStorage.setItem('athar_pass',JSON.stringify(d)); }
-function sessGet(){ try{return JSON.parse(localStorage.getItem('athar_session'));}catch(e){return null;} }
 function roleName(k){ const r=ROLES.find(r=>r.k===k); return r?r.n:k; }
 function allowedFor(role){
-  const acc=accGet();
-  let list=(role==='admin')?SECTIONS.map(s=>s.v):(acc[role]||[]).slice();
+  let list=(role==='admin')?SECTIONS.map(s=>s.v):((ACCESS_DEFAULT[role]||[]).slice());
   if(list.includes('marketing'))list.push('peaks','requests');
   return list;
 }
 function applyAccess(){
-  CUR=sessGet(); if(!CUR)return;
+  if(!CUR)return;
   const allowed=allowedFor(CUR.role);
   document.querySelectorAll('#nav button').forEach(b=>{ b.style.display=allowed.includes(b.dataset.view)?'':'none'; });
   document.getElementById('sess-info').innerHTML=`👤 ${esc(CUR.name)} <span style="opacity:.7">(${roleName(CUR.role)})</span>`;
@@ -1285,46 +1287,71 @@ function applyAccess(){
   const curV=active?active.id.replace('view-',''):'home';
   if(!allowed.includes(curV))show(allowed[0]||'home');
 }
+async function loadRole(email){
+  email=(email||'').toLowerCase();
+  if(email===OWNER_EMAIL)return 'admin';
+  try{ const d=await fdb.collection('roles').doc(email).get(); return d.exists?(d.data().role||'employee'):'employee'; }
+  catch(e){ return 'employee'; }
+}
 function initAuth(){
-  const roleSel=document.getElementById('lg-role');
-  roleSel.onchange=()=>{ const p=passGet(); document.getElementById('lg-pass-wrap').style.display=p[roleSel.value]?'':'none'; };
-  if(sessGet()){ document.getElementById('sess-box').style.display='block'; applyAccess(); }
-  else { document.getElementById('login-ov').style.display='grid'; roleSel.onchange(); }
+  auth.onAuthStateChanged(async user=>{
+    if(user){
+      const email=(user.email||'').toLowerCase();
+      const role=await loadRole(email);
+      CUR={email,role,name:email.split('@')[0]};
+      document.getElementById('login-ov').style.display='none';
+      document.getElementById('sess-box').style.display='block';
+      applyAccess(); show('home');
+    }else{
+      CUR=null;
+      document.getElementById('sess-box').style.display='none';
+      document.getElementById('login-ov').style.display='grid';
+    }
+  });
 }
 function doLogin(){
-  const name=document.getElementById('lg-name').value.trim();
-  const role=document.getElementById('lg-role').value;
+  const email=document.getElementById('lg-email').value.trim();
   const pass=document.getElementById('lg-pass').value;
   const err=document.getElementById('lg-err');
-  if(!name){err.textContent='اكتب اسمك';return;}
-  const p=passGet();
-  if(p[role]&&p[role]!==pass){err.textContent='رمز الدخول غير صحيح';return;}
-  localStorage.setItem('athar_session',JSON.stringify({name,role}));
-  document.getElementById('login-ov').style.display='none';
-  document.getElementById('sess-box').style.display='block';
-  applyAccess(); show('home');
+  if(!email||!pass){err.textContent='أدخل البريد وكلمة المرور';return;}
+  err.textContent='جارٍ الدخول...';
+  auth.signInWithEmailAndPassword(email,pass).then(()=>{err.textContent='';}).catch(e=>{err.textContent=authErr(e.code);});
 }
-function logout(){ localStorage.removeItem('athar_session'); location.reload(); }
-function openAccess(){
-  const acc=accGet(), p=passGet(), g=document.getElementById('access-grid'); g.innerHTML='';
-  ROLES.forEach(r=>{
-    const allowed=(r.k==='admin')?SECTIONS.map(s=>s.v):(acc[r.k]||[]);
-    const checks=SECTIONS.map(s=>`<label><input type="checkbox" data-role="${r.k}" value="${s.v}" ${allowed.includes(s.v)?'checked':''} ${r.k==='admin'?'disabled':''}> ${esc(s.n)}</label>`).join('');
-    g.innerHTML+=`<div class="acc-role"><h4>${r.n}${r.k==='admin'?' — كل الصلاحيات':''}</h4>
-      <div class="acc-checks">${checks}</div>
-      <div style="margin-top:10px"><label style="font-size:12px;color:var(--muted)">رمز الدخول (اختياري)</label>
-      <input data-pass="${r.k}" type="text" value="${esc(p[r.k]||'')}" placeholder="بدون رمز"></div></div>`;
-  });
+function authErr(code){
+  const m={'auth/invalid-email':'بريد غير صحيح','auth/user-not-found':'لا يوجد حساب بهذا البريد','auth/wrong-password':'كلمة المرور غير صحيحة','auth/invalid-credential':'البريد أو كلمة المرور غير صحيحة','auth/too-many-requests':'محاولات كثيرة، انتظر قليلًا','auth/network-request-failed':'تحقّق من اتصال الإنترنت','auth/user-disabled':'الحساب موقوف'};
+  return m[code]||('تعذّر الدخول: '+code);
+}
+function logout(){ auth.signOut(); }
+async function openAccess(){
+  const g=document.getElementById('access-grid'); g.innerHTML='<p style="color:var(--muted);font-size:12px">جارٍ التحميل...</p>';
   document.getElementById('access-ov').style.display='grid';
+  let rows=[]; try{ const snap=await fdb.collection('roles').get(); snap.forEach(d=>rows.push({email:d.id,role:(d.data().role||'employee')})); }catch(e){}
+  let html=`<div class="acc-role"><h4>➕ إضافة/تعديل صلاحية موظف</h4>
+    <div class="form-row">
+      <div style="grid-column:1/-2"><label>بريد الموظف</label><input id="ur-email" type="email" placeholder="employee@example.com"></div>
+      <div><label>الدور</label><select id="ur-role"><option value="employee">موظف</option><option value="secretary">سكرتير</option><option value="admin">مدير</option></select></div>
+      <div><button class="btn" onclick="saveUserRole()">حفظ</button></div>
+    </div>
+    <p style="font-size:11.5px;color:var(--muted);margin:8px 0 0">أنشئ حساب الموظف أولًا في Firebase (Authentication ← Users)، ثم عيّن دوره هنا.</p></div>`;
+  html+=`<div class="acc-role"><h4>الموظفون وأدوارهم</h4>
+    <div style="font-size:12.5px;color:var(--muted);margin-bottom:6px">${esc(OWNER_EMAIL)} — مدير (المالك)</div>`;
+  if(rows.length)rows.forEach(r=>{ html+=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13px">
+    <span>${esc(r.email)} — <b>${roleName(r.role)}</b></span>
+    <button class="btn danger sm" onclick="delUserRole('${esc(r.email)}')">حذف</button></div>`; });
+  else html+=`<p style="font-size:12px;color:var(--muted)">لا يوجد موظفون بعد.</p>`;
+  html+=`</div>`;
+  g.innerHTML=html;
 }
 function closeAccess(){ document.getElementById('access-ov').style.display='none'; }
-function saveAccess(){
-  const acc=accGet();
-  ROLES.forEach(r=>{ if(r.k==='admin')return; acc[r.k]=[...document.querySelectorAll('#access-grid input[type=checkbox][data-role="'+r.k+'"]:checked')].map(i=>i.value); });
-  accSet(acc);
-  const p={}; document.querySelectorAll('#access-grid input[data-pass]').forEach(i=>{ if(i.value.trim())p[i.dataset.pass]=i.value.trim(); });
-  passSet(p);
-  closeAccess(); applyAccess(); alert('تم حفظ الصلاحيات ✅');
+function saveUserRole(){
+  const email=document.getElementById('ur-email').value.trim().toLowerCase();
+  const role=document.getElementById('ur-role').value;
+  if(!email)return alert('أدخل بريد الموظف');
+  fdb.collection('roles').doc(email).set({role}).then(()=>{ alert('تم الحفظ ✅'); openAccess(); }).catch(e=>alert('تعذّر الحفظ: '+e.message));
+}
+function delUserRole(email){
+  if(!confirm('حذف صلاحية '+email+'؟'))return;
+  fdb.collection('roles').doc(email).delete().then(()=>openAccess()).catch(e=>alert('تعذّر الحذف: '+e.message));
 }
 
 /* init */

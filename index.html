@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f1720">
+<title>لوحة تحكم — مشروع أثر</title>
+<style>
+  :root{
+    --bg:#0f1720; --panel:#16212e; --panel2:#1d2c3d; --line:#26384c;
+    --text:#e8eef5; --muted:#93a4b8; --brand:#2ecc9b; --brand2:#1f8f6f;
+    --income:#2ecc71; --expense:#e74c3c; --accent:#3a9bdc; --warn:#f1c40f;
+    --radius:14px; --shadow:0 6px 24px rgba(0,0,0,.28);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;font-family:"Segoe UI",Tahoma,system-ui,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
+  a{color:var(--accent)}
+  .app{display:grid;grid-template-columns:250px 1fr;min-height:100vh}
+  /* Sidebar */
+  .side{background:linear-gradient(180deg,#13202d,#0e1822);border-inline-start:1px solid var(--line);padding:22px 16px;position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .brand .logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;font-weight:800;color:#03271c;font-size:20px}
+  .brand h1{font-size:18px;margin:0}
+  .brand small{color:var(--muted);font-size:12px}
+  .nav{margin-top:22px;display:flex;flex-direction:column;gap:6px}
+  .nav button{display:flex;align-items:center;gap:11px;background:transparent;border:1px solid transparent;color:var(--muted);
+    padding:11px 13px;border-radius:11px;cursor:pointer;font-size:15px;font-family:inherit;text-align:start;transition:.15s}
+  .nav button .ic{font-size:18px;width:22px;text-align:center}
+  .nav button:hover{background:var(--panel);color:var(--text)}
+  .nav button.active{background:var(--panel2);color:#fff;border-color:var(--line);box-shadow:inset 3px 0 0 var(--brand)}
+  .side-foot{position:absolute;bottom:18px;inset-inline:16px;color:var(--muted);font-size:11.5px;line-height:1.7}
+  /* Main */
+  .main{padding:26px 30px;max-width:1100px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px}
+  .topbar h2{margin:0;font-size:23px}
+  .topbar p{margin:4px 0 0;color:var(--muted);font-size:13.5px}
+  .view{display:none;animation:fade .25s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  /* Cards */
+  .grid{display:grid;gap:16px}
+  .grid.home{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+  .tool-card{cursor:pointer;transition:.15s}
+  .tool-card:hover{transform:translateY(-3px);border-color:var(--brand)}
+  .tool-card .ic{font-size:30px}
+  .tool-card h3{margin:12px 0 6px;font-size:17px}
+  .tool-card p{margin:0;color:var(--muted);font-size:13px;line-height:1.6}
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px}
+  .stat .v{font-size:24px;font-weight:800}
+  .stat .l{color:var(--muted);font-size:12.5px;margin-top:3px}
+  /* Forms */
+  .form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end}
+  label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:5px}
+  input,select,textarea{width:100%;background:#0f1a25;border:1px solid var(--line);color:var(--text);
+    padding:10px 11px;border-radius:10px;font-family:inherit;font-size:14px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand)}
+  textarea{min-height:70px;resize:vertical}
+  .btn{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#03271c;border:none;padding:11px 18px;
+    border-radius:10px;font-weight:700;cursor:pointer;font-family:inherit;font-size:14px}
+  .btn:hover{filter:brightness(1.07)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text);font-weight:600}
+  .btn.sm{padding:7px 12px;font-size:12.5px}
+  .btn.danger{background:transparent;border:1px solid #4a2730;color:#ff8a8a}
+  .toolbar{display:flex;gap:9px;flex-wrap:wrap;margin:16px 0}
+  /* Table */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  table{width:100%;border-collapse:collapse;min-width:560px}
+  th,td{padding:11px 13px;text-align:start;border-bottom:1px solid var(--line);font-size:13.5px;white-space:nowrap}
+  th{background:var(--panel2);color:var(--muted);font-weight:600}
+  tr:last-child td{border-bottom:none}
+  .pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:700}
+  .pill.in{background:rgba(46,204,113,.15);color:#5ee089}
+  .pill.out{background:rgba(231,76,60,.15);color:#ff8a8a}
+  .pill.g{background:rgba(58,155,220,.15);color:#7bc4f0}
+  .pill.y{background:rgba(241,196,15,.15);color:#f3d34e}
+  .empty{color:var(--muted);text-align:center;padding:26px;font-size:13.5px}
+  .sec-title{font-size:15px;margin:22px 0 12px;color:#fff;border-inline-start:3px solid var(--brand);padding-inline-start:10px}
+  .row-actions{display:flex;gap:6px}
+  .money.in{color:var(--income)} .money.out{color:var(--expense)}
+  @media(max-width:820px){
+    .app{grid-template-columns:1fr}
+    .side{position:sticky;top:0;height:auto;z-index:20;padding:12px 12px;border-inline-start:none;border-bottom:1px solid var(--line)}
+    .brand{margin-bottom:10px}
+    .nav{margin-top:0;flex-direction:row;overflow-x:auto;gap:8px;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    .nav::-webkit-scrollbar{display:none}
+    .nav button{flex:0 0 auto;padding:9px 13px;white-space:nowrap;font-size:14px}
+    .side-foot{display:none}
+    .main{padding:18px 15px}
+    .topbar h2{font-size:20px}
+  }
+  @media(max-width:480px){
+    .main{padding:14px 11px}
+    .stat .v{font-size:20px}
+    .btn{padding:11px 15px}
+    .tool-card .ic{font-size:26px}
+  }
+  /* Sub-tools */
+  .subtools{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-bottom:18px}
+  .subtool .ic{font-size:26px}
+  .subtool h3{margin:10px 0 5px;font-size:15px}
+  /* Tabs */
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+  .tabs button{background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:9px 15px;border-radius:10px;cursor:pointer;font-family:inherit;font-size:14px}
+  .tabs button.active{background:var(--panel2);color:#fff;border-color:var(--brand);box-shadow:inset 0 -2px 0 var(--brand)}
+  /* Recommendation */
+  .reco{background:linear-gradient(135deg,rgba(46,204,155,.14),rgba(58,155,220,.10));border:1px solid var(--brand);border-radius:var(--radius);padding:18px 20px;margin-bottom:18px}
+  .reco .big{font-size:21px;font-weight:800;margin:6px 0}
+  /* Heatmap */
+  .heat{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  table.heat-tbl{border-collapse:collapse;min-width:560px;width:100%}
+  table.heat-tbl th,table.heat-tbl td{border:1px solid var(--line);padding:0;text-align:center}
+  table.heat-tbl th{background:var(--panel2);color:var(--muted);padding:8px 6px;font-weight:600;font-size:11.5px;white-space:nowrap}
+  .cell{width:100%;height:38px;cursor:pointer;display:grid;place-items:center;font-size:11px;color:#03271c;font-weight:700;transition:.1s}
+  .cell:hover{outline:2px solid var(--brand);outline-offset:-2px}
+  .lv0{background:#1b2a3a;color:var(--muted)} .lv1{background:#2f6d5a}
+  .lv2{background:#28a37a} .lv3{background:#2ecc9b}
+  .day-col{background:var(--panel2);color:#fff;font-weight:700;white-space:nowrap;padding:0 10px;font-size:12.5px}
+  .day-col.today{color:var(--brand)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0;font-size:12.5px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{width:16px;height:16px;border-radius:4px;display:inline-block}
+  .pk-picker{display:flex;flex-wrap:wrap;gap:10px}
+  .pk-chip{display:inline-flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;font-size:14px;user-select:none}
+  .pk-chip:hover{border-color:var(--brand)}
+  .pk-chip input{width:auto;margin:0;accent-color:var(--brand);cursor:pointer}
+  .best-line{font-size:14px;margin-top:8px}
+  /* Auth overlays */
+  .ov{position:fixed;inset:0;background:rgba(6,12,18,.86);backdrop-filter:blur(3px);display:grid;place-items:center;z-index:100;padding:20px}
+  .ov-box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px;width:100%;max-width:380px;box-shadow:var(--shadow);max-height:90vh;overflow:auto}
+  .acc-role{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+  .acc-role h4{margin:0 0 8px;font-size:14px}
+  .acc-checks{display:flex;flex-wrap:wrap;gap:8px}
+  .acc-checks label{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--text);margin:0;background:var(--panel2);padding:6px 9px;border-radius:8px;cursor:pointer}
+  .acc-checks input{width:auto;margin:0;accent-color:var(--brand);cursor:pointer}
+  /* Upload / files */
+  .drop{border:2px dashed var(--line);border-radius:var(--radius);padding:34px 20px;text-align:center;color:var(--muted);cursor:pointer;transition:.15s;background:var(--panel)}
+  .drop:hover,.drop.drag{border-color:var(--brand);background:var(--panel2);color:var(--text)}
+  .drop .big{font-size:34px}
+  .files-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-top:18px}
+  .file-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+  .file-thumb{height:140px;background:#0f1a25;display:grid;place-items:center;overflow:hidden}
+  .file-thumb img,.file-thumb video{width:100%;height:100%;object-fit:cover}
+  .file-thumb .fi{font-size:46px}
+  .file-meta{padding:11px 12px;flex:1;display:flex;flex-direction:column;gap:7px}
+  .file-meta .nm{font-size:13px;font-weight:600;word-break:break-word;line-height:1.4}
+  .file-meta .sub{font-size:11.5px;color:var(--muted)}
+  .file-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+  .file-actions .btn{text-decoration:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">أ</div>
+      <div><h1>مشروع أثر</h1><small>لوحة التحكم</small></div>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-view="home" class="active"><span class="ic">🏠</span> الرئيسية</button>
+      <button data-view="marketing"><span class="ic">📣</span> التسويق</button>
+      <button data-view="design"><span class="ic">🎨</span> التصميم</button>
+      <button data-view="agenda"><span class="ic">🗓️</span> المهام والاجتماعات</button>
+      <button data-view="secretary"><span class="ic">📝</span> السكرتارية</button>
+      <button data-view="study"><span class="ic">📊</span> دراسة الجدوى والتحليل</button>
+      <button data-view="biz"><span class="ic">📈</span> تطوير العمل</button>
+      <button data-view="acc"><span class="ic">🧮</span> المحاسب المبسّط</button>
+      <button data-view="research"><span class="ic">🔎</span> البحث</button>
+    </nav>
+    <div id="sess-box" style="margin-top:16px;font-size:12.5px;color:var(--muted);display:none">
+      <div id="sess-info"></div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn ghost sm" id="btn-access" style="display:none" onclick="openAccess()">🔑 الصلاحيات</button>
+        <button class="btn ghost sm" onclick="logout()">🚪 خروج</button>
+      </div>
+    </div>
+    <div class="side-foot">
+      البيانات تُحفظ محليًا في متصفحك على هذا الجهاز.<br>
+      مشروع جمع التبرعات العينية.
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- HOME -->
+    <section class="view active" id="view-home">
+      <div class="topbar"><div><h2>مرحبًا بك 👋</h2><p>اختر الأداة التي تحتاجها. كل أداة تعمل على حِدة وتحفظ بياناتها.</p></div></div>
+      <div class="stat-row">
+        <div class="stat"><div class="v" id="st-balance">0</div><div class="l">الرصيد الصافي (ريال)</div></div>
+        <div class="stat"><div class="v" id="st-campaigns">0</div><div class="l">حملات تسويقية</div></div>
+        <div class="stat"><div class="v" id="st-tasks">0</div><div class="l">مهام تطوير مفتوحة</div></div>
+        <div class="stat"><div class="v" id="st-research">0</div><div class="l">عناصر بحث</div></div>
+        <div class="stat"><div class="v" id="st-agenda">0</div><div class="l">مهام واجتماعات قادمة</div></div>
+        <div class="stat"><div class="v" id="st-files">0</div><div class="l">ملفات التصميم</div></div>
+      </div>
+      <div class="grid home">
+        <div class="card tool-card" data-goto="marketing"><div class="ic">📣</div><h3>التسويق</h3><p>إدارة الحملات على سناب شات وتيك توك وإنستقرام وتتبّع نتائجها.</p></div>
+        <div class="card tool-card" data-goto="design"><div class="ic">🎨</div><h3>التصميم</h3><p>ارفع واحفظ الصور والفيديوهات وملفات PDF وWord وكل أنواع الملفات في مكان واحد.</p></div>
+        <div class="card tool-card" data-goto="agenda"><div class="ic">🗓️</div><h3>المهام والاجتماعات</h3><p>أضِف مهامك واجتماعاتك بالكتابة أو بالتسجيل الصوتي، وأرسلها لتقويم Google وبريدك.</p></div>
+        <div class="card tool-card" data-goto="secretary"><div class="ic">📝</div><h3>السكرتارية</h3><p>اكتب الخطابات الرسمية واحفظها، مع نماذج جاهزة، وطباعة وتصدير Word.</p></div>
+        <div class="card tool-card" data-goto="study"><div class="ic">📊</div><h3>دراسة الجدوى والتحليل</h3><p>حوّل أي بيانات إلى جداول ومؤشرات ورسوم بيانية دقيقة، وادرس جدوى مشاريعك ماليًا.</p></div>
+        <div class="card tool-card" data-goto="biz"><div class="ic">📈</div><h3>تطوير العمل</h3><p>أفكار ومهام لتحسين التشغيل والتوسّع، مع أولوياتها وحالتها.</p></div>
+        <div class="card tool-card" data-goto="acc"><div class="ic">🧮</div><h3>المحاسب المبسّط</h3><p>تسجيل الدخل والمصروفات واستخراج تقارير مالية فورية.</p></div>
+        <div class="card tool-card" data-goto="research"><div class="ic">🔎</div><h3>البحث</h3><p>حفظ نقاط البحث والمصادر (جهات شراء السكراب، الإسفنج... إلخ).</p></div>
+      </div>
+    </section>
+
+    <!-- MARKETING -->
+    <section class="view" id="view-marketing">
+      <div class="topbar"><div><h2>📣 التسويق</h2><p>سجّل حملاتك التسويقية وتابع أداءها.</p></div></div>
+      <div class="subtools">
+        <div class="card tool-card subtool" data-goto="peaks"><div class="ic">📊</div><h3>أوقات الذروة والمنصات</h3><p>أفضل الأوقات للنشر على سناب وتيك توك وإنستقرام، وتوصية اللحظة الحالية للإعلانات.</p></div>
+        <div class="card tool-card subtool" data-goto="requests"><div class="ic">📥</div><h3>طلبات المنصة</h3><p>صفحة الطلبات — تُدار يدويًا الآن وستُربط لاحقًا بمصدر بياناتها.</p></div>
+      </div>
+      <h3 class="sec-title">تسجيل حملة جديدة</h3>
+      <div class="card">
+        <div class="form-row">
+          <div><label>المنصة</label><select id="mk-platform"><option>سناب شات</option><option>تيك توك</option><option>إنستقرام</option><option>أخرى</option></select></div>
+          <div><label>اسم/وصف الحملة</label><input id="mk-name" placeholder="مثال: حملة الحي الشرقي"></div>
+          <div><label>الميزانية (ريال)</label><input id="mk-budget" type="number" min="0" placeholder="0"></div>
+          <div><label>النتائج (متبرعون/طلبات)</label><input id="mk-results" type="number" min="0" placeholder="0"></div>
+          <div><label>الحالة</label><select id="mk-status"><option>مخطّطة</option><option>نشطة</option><option>منتهية</option></select></div>
+          <div><button class="btn" onclick="addMarketing()">＋ إضافة</button></div>
+        </div>
+      </div>
+      <h3 class="sec-title">الحملات المسجّلة</h3>
+      <div class="tbl-wrap"><table><thead><tr><th>المنصة</th><th>الحملة</th><th>الميزانية</th><th>النتائج</th><th>التكلفة/نتيجة</th><th>الحالة</th><th></th></tr></thead><tbody id="mk-body"></tbody></table></div>
+    </section>
+
+    <!-- BIZ DEV -->
+    <section class="view" id="view-biz">
+      <div class="topbar"><div><h2>📈 تطوير العمل</h2><p>أفكار ومهام التحسين والتوسّع.</p></div></div>
+      <div class="card">
+        <div class="form-row">
+          <div style="grid-column:1/-2"><label>الفكرة / المهمة</label><input id="bz-title" placeholder="مثال: تصميم تطبيق يربط المتبرع بالمستودع"></div>
+          <div><label>الأولوية</label><select id="bz-prio"><option>عالية</option><option>متوسطة</option><option>منخفضة</option></select></div>
+          <div><label>الحالة</label><select id="bz-status"><option>جديدة</option><option>قيد التنفيذ</option><option>منجزة</option></select></div>
+          <div><button class="btn" onclick="addBiz()">＋ إضافة</button></div>
+        </div>
+      </div>
+      <h3 class="sec-title">قائمة المهام</h3>
+      <div class="tbl-wrap"><table><thead><tr><th>الفكرة / المهمة</th><th>الأولوية</th><th>الحالة</th><th></th></tr></thead><tbody id="bz-body"></tbody></table></div>
+    </section>
+
+    <!-- ACCOUNTANT -->
+    <section class="view" id="view-acc">
+      <div class="topbar"><div><h2>🧮 المحاسب المبسّط</h2><p>سجّل الحركات المالية واحصل على تقرير فوري.</p></div></div>
+      <div class="stat-row">
+        <div class="stat"><div class="v money in" id="ac-in">0</div><div class="l">إجمالي الدخل</div></div>
+        <div class="stat"><div class="v money out" id="ac-out">0</div><div class="l">إجمالي المصروفات</div></div>
+        <div class="stat"><div class="v" id="ac-net">0</div><div class="l">الصافي</div></div>
+      </div>
+      <div class="card">
+        <div class="form-row">
+          <div><label>النوع</label><select id="ac-type"><option value="in">دخل</option><option value="out">مصروف</option></select></div>
+          <div><label>الفئة</label><input id="ac-cat" list="ac-cats" placeholder="مثال: رواتب، وقود، إيجار"><datalist id="ac-cats"><option>رواتب</option><option>إيجار مكتب</option><option>إيجار مستودع</option><option>وقود</option><option>صيانة</option><option>تسويق</option><option>بيع سكراب</option><option>بيع إسفنج</option><option>تبرعات نقدية</option></datalist></div>
+          <div><label>المبلغ (ريال)</label><input id="ac-amount" type="number" min="0" placeholder="0"></div>
+          <div><label>التاريخ</label><input id="ac-date" type="date"></div>
+          <div style="grid-column:1/-1"><label>ملاحظة</label><input id="ac-note" placeholder="تفاصيل اختيارية"></div>
+          <div><button class="btn" onclick="addAcc()">＋ تسجيل</button></div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="btn ghost sm" onclick="printReport()">🖨️ طباعة تقرير</button>
+        <button class="btn ghost sm" onclick="exportCSV()">⬇️ تصدير CSV</button>
+      </div>
+      <h3 class="sec-title">تقرير حسب الفئة</h3>
+      <div class="tbl-wrap"><table><thead><tr><th>الفئة</th><th>النوع</th><th>الإجمالي</th></tr></thead><tbody id="ac-report"></tbody></table></div>
+      <h3 class="sec-title">كل الحركات</h3>
+      <div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الفئة</th><th>المبلغ</th><th>ملاحظة</th><th></th></tr></thead><tbody id="ac-body"></tbody></table></div>
+    </section>
+
+    <!-- RESEARCH -->
+    <section class="view" id="view-research">
+      <div class="topbar"><div><h2>🔎 البحث</h2><p>احفظ نقاط البحث والمصادر المهمة.</p></div></div>
+      <div class="card">
+        <div class="form-row">
+          <div><label>الموضوع</label><input id="rs-topic" placeholder="مثال: جهات شراء السكراب"></div>
+          <div style="grid-column:2/-2"><label>المصدر / الرابط</label><input id="rs-src" placeholder="اسم جهة أو رابط"></div>
+          <div><button class="btn" onclick="addResearch()">＋ إضافة</button></div>
+          <div style="grid-column:1/-1"><label>الملاحظات</label><textarea id="rs-notes" placeholder="تفاصيل، أسعار، أرقام تواصل..."></textarea></div>
+        </div>
+      </div>
+      <h3 class="sec-title">عناصر البحث</h3>
+      <div id="rs-list" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))"></div>
+    </section>
+
+    <!-- PEAK TIMES -->
+    <section class="view" id="view-peaks">
+      <div class="topbar">
+        <div><h2>📊 أوقات الذروة والمنصات</h2><p>حدّد أفضل منصة ووقت للنشر والإعلانات المموّلة.</p></div>
+        <button class="btn ghost sm" onclick="resetPeaks()">↺ استرجاع القيم الافتراضية</button>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <p style="margin:0;font-size:13px;color:var(--muted);line-height:1.9">
+          ℹ️ الأرقام هنا <b style="color:var(--text)">تقديرية قابلة للتعديل</b> وتُحدَّث يدويًا (يُفضّل أسبوعيًا) من تقارير
+          <b style="color:var(--text)">Sprout Social</b> و<b style="color:var(--text)">Hootsuite</b> و<b style="color:var(--text)">Buffer</b> «Best Time to Post».
+          العدّ اللحظي الحقيقي لعدد المستخدمين يتطلّب ربطًا برمجيًا (API) وخادمًا؛ أمّا هذه الأداة فتعمل بالكامل داخل متصفحك.<br>
+          👆 اضغط أي خانة في الجدول لرفع/خفض مستوى النشاط وحفظه.
+        </p>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <label style="margin-bottom:10px;font-size:13.5px;color:var(--text)">اختر المنصة (أو أكثر من منصة) التي تريد معرفة أفضل وقت للنشر فيها:</label>
+        <div id="pk-picker" class="pk-picker"></div>
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+          <button class="btn" onclick="pkSearch()">🔎 بحث / عرض أفضل وقت</button>
+          <button class="btn ghost sm" onclick="pkSelectAll()">تحديد الكل</button>
+        </div>
+      </div>
+      <div class="reco" id="reco"></div>
+      <div class="legend">
+        <span><i class="lv0"></i> منخفض</span><span><i class="lv1"></i> متوسط</span>
+        <span><i class="lv2"></i> مرتفع</span><span><i class="lv3"></i> ذروة</span>
+      </div>
+      <div id="pk-results"></div>
+    </section>
+
+    <!-- PLATFORM REQUESTS -->
+    <section class="view" id="view-requests">
+      <div class="topbar"><div><h2>📥 طلبات المنصة</h2><p>صفحة الطلبات — تُدار يدويًا الآن، وستُربط لاحقًا بمصدر بياناتها.</p></div></div>
+      <div class="card">
+        <div class="form-row">
+          <div><label>المنصة / المصدر</label><input id="rq-src" placeholder="مثال: سناب شات، نموذج، واتساب"></div>
+          <div style="grid-column:2/-2"><label>وصف الطلب</label><input id="rq-desc" placeholder="مثال: طلب تبرع أثاث من حي..."></div>
+          <div><label>الحالة</label><select id="rq-status"><option>جديد</option><option>قيد المعالجة</option><option>منجز</option></select></div>
+          <div><button class="btn" onclick="addReq()">＋ إضافة</button></div>
+        </div>
+      </div>
+      <h3 class="sec-title">الطلبات</h3>
+      <div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>المنصة/المصدر</th><th>الوصف</th><th>الحالة</th><th></th></tr></thead><tbody id="rq-body"></tbody></table></div>
+    </section>
+
+    <!-- DESIGN FILES -->
+    <section class="view" id="view-design">
+      <div class="topbar">
+        <div><h2>🎨 التصميم</h2><p>ارفع واحفظ كل أنواع الصور والفيديوهات وملفات PDF وWord وغيرها.</p></div>
+        <div class="stat" style="padding:9px 16px"><div class="v" id="dz-count" style="font-size:18px">0</div><div class="l" id="dz-size">0 ب</div></div>
+      </div>
+      <div class="drop" id="drop">
+        <div class="big">⬆️</div>
+        <div style="margin-top:8px">اسحب الملفات هنا أو <b style="color:var(--brand)">اضغط للاختيار</b></div>
+        <div style="font-size:12px;margin-top:6px">صور • فيديو • PDF • Word • Excel • أي ملف — تُحفظ داخل متصفحك على هذا الجهاز</div>
+        <input type="file" id="file-in" multiple accept="*/*" style="display:none">
+      </div>
+      <div class="files-grid" id="files-grid"></div>
+    </section>
+
+    <!-- AGENDA (Tasks & Meetings + Gmail) -->
+    <section class="view" id="view-agenda">
+      <div class="topbar"><div><h2>🗓️ المهام والاجتماعات</h2><p>أضِف بالكتابة أو بالتسجيل الصوتي، ثم أرسِلها لتقويم Google أو بريدك.</p></div></div>
+      <div class="card">
+        <div class="form-row">
+          <div><label>النوع</label><select id="ag-type"><option value="task">مهمة</option><option value="meeting">اجتماع</option></select></div>
+          <div style="grid-column:2/-1"><label>العنوان</label>
+            <div style="display:flex;gap:8px">
+              <input id="ag-title" placeholder="مثال: اجتماع مع مستودع التبرعات">
+              <button class="btn ghost" id="ag-mic" type="button" onclick="micToField('ag-title')" title="تسجيل صوتي">🎙️</button>
+            </div>
+          </div>
+          <div><label>التاريخ</label><input id="ag-date" type="date"></div>
+          <div><label>الوقت</label><input id="ag-time" type="time"></div>
+          <div style="grid-column:1/-2"><label>ملاحظات / تفاصيل</label>
+            <div style="display:flex;gap:8px">
+              <input id="ag-notes" placeholder="تفاصيل، مكان، رابط...">
+              <button class="btn ghost" type="button" onclick="micToField('ag-notes')" title="تسجيل صوتي">🎙️</button>
+            </div>
+          </div>
+          <div><button class="btn" onclick="addAgenda()">＋ إضافة</button></div>
+        </div>
+        <p id="ag-mic-note" style="margin:12px 0 0;font-size:12px;color:var(--muted)"></p>
+      </div>
+      <h3 class="sec-title">القادمة والحالية</h3>
+      <div id="ag-list" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))"></div>
+    </section>
+
+    <!-- SECRETARY / LETTERS -->
+    <section class="view" id="view-secretary">
+      <div class="topbar">
+        <div><h2>📝 السكرتارية</h2><p>اكتب الخطابات الرسمية واحفظها، واستعن بالنماذج الجاهزة لفهم آلية العمل.</p></div>
+        <div class="stat" style="padding:9px 16px"><div class="v" id="sc-count" style="font-size:18px">0</div><div class="l">خطاب محفوظ</div></div>
+      </div>
+      <h3 class="sec-title">نماذج جاهزة — اضغط «استخدام كنموذج» لبدء خطاب منها</h3>
+      <div id="sc-templates" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))"></div>
+      <h3 class="sec-title" id="sc-editor-title">كتابة خطاب جديد</h3>
+      <div class="card">
+        <input type="hidden" id="sc-id">
+        <div class="form-row">
+          <div style="grid-column:1/-2"><label>عنوان / موضوع الخطاب</label><input id="sc-title" placeholder="مثال: طلب دعم حملة جمع التبرعات"></div>
+          <div><label>الحالة</label><select id="sc-status"><option>مسودة</option><option>جاهز</option><option>مُرسل</option></select></div>
+          <div><label>الجهة / المرسَل إليه</label><input id="sc-to" placeholder="مثال: أمانة منطقة الرياض"></div>
+          <div><label>رقم المرجع</label><input id="sc-ref" placeholder="اختياري"></div>
+          <div><label>التاريخ</label><input id="sc-date" type="date"></div>
+          <div style="grid-column:1/-1"><label>نص الخطاب</label><textarea id="sc-body" style="min-height:220px" placeholder="اكتب نص الخطاب هنا..."></textarea></div>
+        </div>
+        <div class="toolbar">
+          <button class="btn" onclick="saveLetter()">💾 حفظ الخطاب</button>
+          <button class="btn ghost sm" onclick="newLetter()">＋ خطاب جديد</button>
+          <button class="btn ghost sm" onclick="printLetter()">🖨️ طباعة / PDF</button>
+          <button class="btn ghost sm" onclick="exportLetterDoc()">⬇️ تصدير Word</button>
+        </div>
+      </div>
+      <h3 class="sec-title">الخطابات المحفوظة</h3>
+      <div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>الموضوع</th><th>الجهة</th><th>الحالة</th><th></th></tr></thead><tbody id="sc-body-list"></tbody></table></div>
+      <p style="font-size:12px;color:var(--muted);margin-top:12px">☁️ الحفظ حاليًا داخل متصفحك على هذا الجهاز. الحفظ على السحابة ومشاركة الخطابات بين الموظفين سيُفعَّل عند استضافة اللوحة.</p>
+    </section>
+
+    <!-- FEASIBILITY & DATA ANALYSIS -->
+    <section class="view" id="view-study">
+      <div class="topbar">
+        <div><h2>📊 دراسة الجدوى وتحليل البيانات</h2><p>حوّل بياناتك إلى جداول ومؤشرات ورسوم تحليلية دقيقة.</p></div>
+        <button class="btn ghost sm" onclick="stExport()">⬇️ تصدير CSV</button>
+      </div>
+      <div class="tabs" id="st-tabs">
+        <button class="active" onclick="stTab('feas',this)">🏗️ دراسة جدوى</button>
+        <button onclick="stTab('anal',this)">🧮 محلّل بيانات عام</button>
+        <button onclick="stTab('gen',this)">🎯 مولّد حسب الطلب</button>
+      </div>
+
+      <!-- Feasibility -->
+      <div id="st-feas">
+        <div class="form-row" style="margin-bottom:8px">
+          <div style="grid-column:1/-2"><label>اسم المشروع / الدراسة</label><input id="st-fname" onchange="feasName(this.value)" placeholder="مثال: مشروع إعادة تدوير الإسفنج"></div>
+          <div><label>عدد أشهر التوقّع</label><input id="st-fmonths" type="number" min="1" value="12" onchange="feasMonths(this.value)"></div>
+        </div>
+        <div id="st-kpis" class="stat-row"></div>
+        <div id="st-feas-lists"></div>
+        <h3 class="sec-title">مقارنة الإيراد والتشغيل وصافي الربح (شهريًا)</h3>
+        <div class="card" id="st-feas-bars" style="overflow-x:auto"></div>
+        <h3 class="sec-title">التدفق النقدي التراكمي ونقطة الاسترداد</h3>
+        <div class="card" id="st-feas-line" style="overflow-x:auto"></div>
+      </div>
+
+      <!-- General analyzer -->
+      <div id="st-anal" style="display:none">
+        <div class="card">
+          <label>الصق بياناتك (من Excel أو CSV — أعمدة مفصولة بفاصلة أو Tab، وأول صف عناوين)</label>
+          <textarea id="st-paste" style="min-height:130px" placeholder="الصنف,الكمية,السعر — ثم كل صنف في سطر"></textarea>
+          <div class="toolbar"><button class="btn" onclick="stParse()">🧮 تحليل البيانات</button></div>
+        </div>
+        <div id="st-anal-table"></div>
+        <h3 class="sec-title">إحصاءات الأعمدة الرقمية</h3>
+        <div id="st-anal-stats"></div>
+        <h3 class="sec-title">رسم بياني</h3>
+        <div class="form-row" style="margin-bottom:10px">
+          <div><label>عمود التصنيف</label><select id="st-lab" onchange="renderAnalChart()"></select></div>
+          <div><label>عمود القيمة</label><select id="st-val" onchange="renderAnalChart()"></select></div>
+        </div>
+        <div class="card" id="st-anal-chart" style="overflow-x:auto"></div>
+      </div>
+
+      <!-- Generator by request -->
+      <div id="st-gen" style="display:none">
+        <div class="card">
+          <label>١) الصق البيانات (إن كان المخرج يحتاج بيانات) — أول صف عناوين</label>
+          <textarea id="gn-data" style="min-height:110px" placeholder="الشهر,التبرعات — ثم كل صف في سطر"></textarea>
+          <div class="form-row" style="margin-top:10px">
+            <div><label>٢) نوع المخرج المطلوب</label>
+              <select id="gn-type" onchange="genFields()">
+                <option value="auto">تلقائي (يختار الأنسب)</option>
+                <option value="table">جدول</option>
+                <option value="bar">رسم أعمدة</option>
+                <option value="line">رسم خطي</option>
+                <option value="kpi">بطاقات مؤشرات</option>
+              </select>
+            </div>
+            <div id="gn-lab-wrap"><label>عمود التصنيف</label><select id="gn-lab"></select></div>
+            <div id="gn-val-wrap"><label>عمود القيمة</label><select id="gn-val"></select></div>
+            <div style="grid-column:1/-1"><label>عنوان التقرير (اختياري)</label><input id="gn-title" placeholder="مثال: تبرعات الربع الأول"></div>
+          </div>
+          <div class="toolbar"><button class="btn" onclick="genBuild()">🎨 صمّم</button></div>
+        </div>
+        <div id="gn-result"></div>
+        <div class="card" style="margin-top:16px">
+          <label>مربع طلبك الخاص — اكتب بالضبط ما تحتاجه (يصلني لتنفيذه، وسيتحوّل لذكاء اصطناعي يفهمه تلقائيًا عند الاستضافة)</label>
+          <textarea id="gn-req" style="min-height:90px" placeholder="مثال: أريد تقريرًا يقارن التبرعات بين الأحياء مع نسبة النمو الشهري ولون مميّز لكل حي..."></textarea>
+          <div class="toolbar"><button class="btn ghost sm" onclick="saveReq()">💾 حفظ الطلب</button></div>
+          <div id="gn-req-list" style="margin-top:6px"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Login overlay -->
+<div id="login-ov" class="ov" style="display:none">
+  <div class="ov-box">
+    <div class="brand" style="justify-content:center;margin-bottom:16px">
+      <div class="logo">أ</div><div><h1>مشروع أثر</h1><small>تسجيل الدخول</small></div>
+    </div>
+    <label>الاسم</label><input id="lg-name" placeholder="اكتب اسمك">
+    <label style="margin-top:10px">الدور</label>
+    <select id="lg-role"><option value="admin">مدير</option><option value="employee">موظف</option><option value="secretary">سكرتير</option></select>
+    <div id="lg-pass-wrap" style="display:none"><label style="margin-top:10px">رمز الدخول</label><input id="lg-pass" type="password" placeholder="الرمز"></div>
+    <button class="btn" style="width:100%;margin-top:16px" onclick="doLogin()">دخول</button>
+    <p id="lg-err" style="color:#ff8a8a;font-size:12.5px;margin:10px 0 0;min-height:16px"></p>
+    <p style="font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.7">⚠️ نظام صلاحيات تنظيمي مؤقت (غير آمن) — سيُستبدل بتسجيل دخول حقيقي عبر Firebase عند الاستضافة.</p>
+  </div>
+</div>
+
+<!-- Access editor overlay (admin) -->
+<div id="access-ov" class="ov" style="display:none">
+  <div class="ov-box" style="max-width:560px">
+    <h3 style="margin:0 0 4px">🔑 إدارة الصلاحيات</h3>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 14px">حدّد الأقسام المسموحة لكل دور، ويمكنك ضبط رمز دخول لكل دور (اختياري).</p>
+    <div id="access-grid"></div>
+    <div class="toolbar"><button class="btn" onclick="saveAccess()">💾 حفظ</button><button class="btn ghost sm" onclick="closeAccess()">إغلاق</button></div>
+  </div>
+</div>
+
+<script>
+const DB={
+  get:(k)=>JSON.parse(localStorage.getItem('athar_'+k)||'[]'),
+  set:(k,v)=>localStorage.setItem('athar_'+k,JSON.stringify(v))
+};
+const fmt=n=>Number(n||0).toLocaleString('en-US');
+const uid=()=>Date.now()+''+Math.floor(Math.random()*999);
+
+/* Navigation */
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
+document.querySelectorAll('[data-goto]').forEach(c=>c.onclick=()=>show(c.dataset.goto));
+let CUR=null;
+function show(v){
+  if(CUR){ const al=allowedFor(CUR.role); if(!al.includes(v))return; }
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
+  document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='view-'+v));
+  window.scrollTo(0,0);
+}
+
+/* ---- Marketing ---- */
+function addMarketing(){
+  const name=document.getElementById('mk-name').value.trim();
+  if(!name)return alert('اكتب اسم الحملة');
+  const arr=DB.get('mk');
+  arr.push({id:uid(),platform:mk_platform.value,name,budget:+mk_budget.value||0,results:+mk_results.value||0,status:mk_status.value});
+  DB.set('mk',arr); mk_name.value=mk_budget.value=mk_results.value=''; renderMk(); renderHome();
+}
+function renderMk(){
+  const arr=DB.get('mk'),b=document.getElementById('mk-body');
+  b.innerHTML=arr.length?'':'<tr><td colspan="7" class="empty">لا توجد حملات بعد.</td></tr>';
+  arr.forEach(x=>{
+    const cpr=x.results>0?fmt(Math.round(x.budget/x.results)):'—';
+    const pc=x.status==='نشطة'?'in':x.status==='منتهية'?'g':'y';
+    b.innerHTML+=`<tr><td>${x.platform}</td><td>${esc(x.name)}</td><td>${fmt(x.budget)}</td><td>${fmt(x.results)}</td><td>${cpr}</td>
+      <td><span class="pill ${pc}">${x.status}</span></td>
+      <td><button class="btn danger sm" onclick="del('mk','${x.id}',renderMk)">حذف</button></td></tr>`;
+  });
+}
+
+/* ---- Biz Dev ---- */
+function addBiz(){
+  const t=document.getElementById('bz-title').value.trim();
+  if(!t)return alert('اكتب الفكرة أو المهمة');
+  const arr=DB.get('bz'); arr.push({id:uid(),title:t,prio:bz_prio.value,status:bz_status.value});
+  DB.set('bz',arr); bz_title.value=''; renderBz(); renderHome();
+}
+function renderBz(){
+  const arr=DB.get('bz'),b=document.getElementById('bz-body');
+  b.innerHTML=arr.length?'':'<tr><td colspan="4" class="empty">لا توجد مهام بعد.</td></tr>';
+  arr.forEach(x=>{
+    const pp=x.prio==='عالية'?'out':x.prio==='متوسطة'?'y':'g';
+    const sp=x.status==='منجزة'?'in':x.status==='قيد التنفيذ'?'g':'y';
+    b.innerHTML+=`<tr><td>${esc(x.title)}</td><td><span class="pill ${pp}">${x.prio}</span></td>
+      <td><span class="pill ${sp}">${x.status}</span></td>
+      <td><button class="btn danger sm" onclick="del('bz','${x.id}',renderBz)">حذف</button></td></tr>`;
+  });
+}
+
+/* ---- Accountant ---- */
+function addAcc(){
+  const amt=+document.getElementById('ac-amount').value;
+  if(!amt||amt<=0)return alert('أدخل مبلغًا صحيحًا');
+  const arr=DB.get('ac');
+  arr.push({id:uid(),type:ac_type.value,cat:ac_cat.value.trim()||'غير مصنّف',amount:amt,date:ac_date.value||new Date().toISOString().slice(0,10),note:ac_note.value.trim()});
+  DB.set('ac',arr); ac_amount.value=ac_note.value=''; renderAcc(); renderHome();
+}
+function renderAcc(){
+  const arr=DB.get('ac').sort((a,b)=>b.date.localeCompare(a.date));
+  let tin=0,tout=0; const cats={};
+  arr.forEach(x=>{ x.type==='in'?tin+=x.amount:tout+=x.amount;
+    const k=x.cat+'|'+x.type; cats[k]=(cats[k]||0)+x.amount; });
+  document.getElementById('ac-in').textContent=fmt(tin);
+  document.getElementById('ac-out').textContent=fmt(tout);
+  const net=tin-tout, ne=document.getElementById('ac-net');
+  ne.textContent=fmt(net); ne.className='v'; ne.classList.add(net>=0?'money':'','',net>=0?'in':'out');
+  ne.style.color=net>=0?'var(--income)':'var(--expense)';
+  // report
+  const rb=document.getElementById('ac-report');
+  const keys=Object.keys(cats);
+  rb.innerHTML=keys.length?'':'<tr><td colspan="3" class="empty">لا توجد بيانات.</td></tr>';
+  keys.sort((a,b)=>cats[b]-cats[a]).forEach(k=>{
+    const [cat,t]=k.split('|');
+    rb.innerHTML+=`<tr><td>${esc(cat)}</td><td><span class="pill ${t==='in'?'in':'out'}">${t==='in'?'دخل':'مصروف'}</span></td><td class="money ${t}">${fmt(cats[k])}</td></tr>`;
+  });
+  // all rows
+  const b=document.getElementById('ac-body');
+  b.innerHTML=arr.length?'':'<tr><td colspan="6" class="empty">لا توجد حركات بعد.</td></tr>';
+  arr.forEach(x=>{
+    b.innerHTML+=`<tr><td>${x.date}</td><td><span class="pill ${x.type==='in'?'in':'out'}">${x.type==='in'?'دخل':'مصروف'}</span></td>
+      <td>${esc(x.cat)}</td><td class="money ${x.type}">${fmt(x.amount)}</td><td>${esc(x.note)||'—'}</td>
+      <td><button class="btn danger sm" onclick="del('ac','${x.id}',renderAcc)">حذف</button></td></tr>`;
+  });
+}
+function exportCSV(){
+  const arr=DB.get('ac'); if(!arr.length)return alert('لا توجد حركات للتصدير');
+  let csv='﻿التاريخ,النوع,الفئة,المبلغ,ملاحظة\n';
+  arr.forEach(x=>csv+=`${x.date},${x.type==='in'?'دخل':'مصروف'},"${x.cat}",${x.amount},"${x.note||''}"\n`);
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='تقرير-مالي-اثر.csv'; a.click();
+}
+function printReport(){ show('acc'); window.print(); }
+
+/* ---- Research ---- */
+function addResearch(){
+  const t=document.getElementById('rs-topic').value.trim();
+  if(!t)return alert('اكتب موضوع البحث');
+  const arr=DB.get('rs'); arr.push({id:uid(),topic:t,src:rs_src.value.trim(),notes:rs_notes.value.trim()});
+  DB.set('rs',arr); rs_topic.value=rs_src.value=rs_notes.value=''; renderRs(); renderHome();
+}
+function renderRs(){
+  const arr=DB.get('rs'),el=document.getElementById('rs-list');
+  el.innerHTML=arr.length?'':'<div class="empty">لا توجد عناصر بحث بعد.</div>';
+  arr.forEach(x=>{
+    const link=x.src?(/^https?:/.test(x.src)?`<a href="${esc(x.src)}" target="_blank">${esc(x.src)}</a>`:esc(x.src)):'';
+    el.innerHTML+=`<div class="card"><h3 style="margin:0 0 8px;font-size:15px">${esc(x.topic)}</h3>
+      ${link?`<div style="font-size:12.5px;margin-bottom:8px;color:var(--muted)">🔗 ${link}</div>`:''}
+      ${x.notes?`<p style="margin:0 0 10px;font-size:13px;color:#c7d3e0;line-height:1.7;white-space:pre-wrap">${esc(x.notes)}</p>`:''}
+      <button class="btn danger sm" onclick="del('rs','${x.id}',renderRs)">حذف</button></div>`;
+  });
+}
+
+/* ---- Shared ---- */
+function del(k,id,cb){ if(!confirm('تأكيد الحذف؟'))return; DB.set(k,DB.get(k).filter(x=>x.id!==id)); cb(); renderHome(); }
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function renderHome(){
+  const ac=DB.get('ac'); let net=0; ac.forEach(x=>net+=x.type==='in'?x.amount:-x.amount);
+  document.getElementById('st-balance').textContent=fmt(net);
+  document.getElementById('st-campaigns').textContent=DB.get('mk').length;
+  document.getElementById('st-tasks').textContent=DB.get('bz').filter(x=>x.status!=='منجزة').length;
+  document.getElementById('st-research').textContent=DB.get('rs').length;
+  document.getElementById('st-agenda').textContent=DB.get('ag').filter(x=>!x.done).length;
+  updateFileStat();
+}
+async function updateFileStat(){ try{ const f=await IDB.all(); const e=document.getElementById('st-files'); if(e)e.textContent=f.length; }catch(_){} }
+
+/* ---- Peak times (أوقات الذروة) ---- */
+const PK_PLAT=[
+  {k:'tiktok',n:'تيك توك',i:'🎵'},
+  {k:'snap',n:'سناب شات',i:'👻'},
+  {k:'insta',n:'إنستقرام',i:'📸'},
+  {k:'facebook',n:'فيسبوك',i:'📘'},
+  {k:'twitter',n:'تويتر (X)',i:'🐦'}
+];
+const PK_DAYS=['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const PK_BLOCKS=['١٢–٤ فجرًا','٤–٨ صباحًا','٨–١٢ ظهرًا','١٢–٤ عصرًا','٤–٨ مساءً','٨–١٢ ليلًا'];
+let pkChosen=new Set();
+const PK_VERSION=20262; // معايير «أفضل أوقات النشر» العامة 2026 (تيك توك/سناب/إنستقرام/فيسبوك/تويتر)
+function pkProfile(base,strongDays){
+  const g=[];
+  for(let d=0;d<7;d++){
+    const strong=strongDays.includes(d); // الثلاثاء–الخميس أقوى الأيام تفاعلًا
+    const row=[];
+    for(let b=0;b<6;b++){
+      let l=base[b];
+      if(!strong&&l>0)l=Math.max(0,l-1);
+      row.push(l);
+    }
+    g.push(row);
+  }
+  return g;
+}
+function pkSeed(){
+  const strong=[2,3,4]; // الثلاثاء، الأربعاء، الخميس
+  // base = مستوى كل فترة (٦ فترات: ١٢–٤ف، ٤–٨ص، ٨–١٢ظ، ١٢–٤ع، ٤–٨م، ٨–١٢ل) في يوم قوي
+  return{
+    _v:PK_VERSION,
+    snap:{grid:pkProfile([0,1,1,2,3,3],strong),users:'',note:'الذروة مساءً وبعد العشاء (٦–١٢ ليلًا)'},
+    tiktok:{grid:pkProfile([0,1,1,3,3,2],strong),users:'',note:'الذروة ٢–٨ مساءً، والثلاثاء–الخميس الأقوى (معايير 2026)'},
+    insta:{grid:pkProfile([0,1,2,3,3,2],strong),users:'',note:'الأربعاء ١٢ظ و٦م، والخميس ٩ص، والثلاثاء–الخميس الأقوى (معايير 2026)'},
+    facebook:{grid:pkProfile([0,1,3,3,2,1],strong),users:'',note:'الأفضل صباحًا وظهرًا في أيام العمل (٩ص–١ظ)، والثلاثاء–الخميس الأقوى (معايير 2026)'},
+    twitter:{grid:pkProfile([0,1,3,3,2,1],strong),users:'',note:'الأفضل ٩ص–٣ع في أيام العمل، والثلاثاء–الخميس الأقوى (معايير 2026)'}
+  };
+}
+function pkLoad(){ try{const d=JSON.parse(localStorage.getItem('athar_peaks')); if(d&&d.snap&&d._v===PK_VERSION)return d;}catch(e){} const s=pkSeed(); localStorage.setItem('athar_peaks',JSON.stringify(s)); return s; }
+function pkSave(d){ localStorage.setItem('athar_peaks',JSON.stringify(d)); }
+function renderPeaks(){ renderPicker(); renderView(); }
+function renderPicker(){
+  const el=document.getElementById('pk-picker'); el.innerHTML='';
+  PK_PLAT.forEach(p=>{
+    const lab=document.createElement('label'); lab.className='pk-chip';
+    lab.innerHTML=`<input type="checkbox" value="${p.k}" ${pkChosen.has(p.k)?'checked':''}><span>${p.i} ${p.n}</span>`;
+    el.appendChild(lab);
+  });
+}
+function pkSelectAll(){ document.querySelectorAll('#pk-picker input').forEach(i=>i.checked=true); }
+function pkSearch(){
+  pkChosen=new Set([...document.querySelectorAll('#pk-picker input:checked')].map(i=>i.value));
+  if(!pkChosen.size)return alert('اختر منصة واحدة على الأقل ثم اضغط بحث');
+  renderView();
+}
+function pkBest(grid){
+  const col=[0,0,0,0,0,0], row=[0,0,0,0,0,0,0];
+  for(let d=0;d<7;d++)for(let b=0;b<6;b++){col[b]+=grid[d][b];row[d]+=grid[d][b];}
+  const mc=Math.max(...col), mr=Math.max(...row), blocks=[], days=[];
+  col.forEach((v,i)=>{ if(v===mc&&v>0)blocks.push(i); });
+  row.forEach((v,i)=>{ if(v===mr&&v>0)days.push(i); });
+  return {blocks,days};
+}
+function heatHTML(key,g){
+  const now=new Date(), td=now.getDay(), tbk=Math.floor(now.getHours()/4);
+  let html='<thead><tr><th>اليوم / الوقت</th>'+PK_BLOCKS.map(x=>`<th>${x}</th>`).join('')+'</tr></thead><tbody>';
+  for(let dd=0;dd<7;dd++){
+    html+=`<tr><td class="day-col${dd===td?' today':''}">${PK_DAYS[dd]}${dd===td?' •':''}</td>`;
+    for(let bb=0;bb<6;bb++){
+      const lv=g[dd][bb], isNow=(dd===td&&bb===tbk), txt=lv===3?'ذروة':lv===2?'●●':lv===1?'●':'';
+      html+=`<td><div class="cell lv${lv}" style="${isNow?'outline:2px solid #fff;outline-offset:-2px':''}" onclick="pkCycle('${key}',${dd},${bb})">${txt}</div></td>`;
+    }
+    html+='</tr>';
+  }
+  return html+'</tbody>';
+}
+function renderView(){
+  const d=pkLoad(); renderReco(d);
+  const wrap=document.getElementById('pk-results');
+  if(!pkChosen.size){ wrap.innerHTML=''; return; }
+  wrap.innerHTML='';
+  PK_PLAT.filter(p=>pkChosen.has(p.k)).forEach(p=>{
+    const pd=d[p.k]; if(!pd)return;
+    const best=pkBest(pd.grid);
+    const daysTxt=best.days.map(i=>PK_DAYS[i]).join('، ')||'—';
+    const blocksTxt=best.blocks.map(i=>PK_BLOCKS[i]).join('، ')||'—';
+    const sec=document.createElement('div'); sec.className='card'; sec.style.marginBottom='16px';
+    sec.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <h3 style="margin:0;font-size:17px">${p.i} ${p.n}</h3>
+        ${pd.users?`<span class="pill g">👥 ${esc(pd.users)}</span>`:''}
+      </div>
+      <div class="best-line">📅 أفضل الأيام: <b>${daysTxt}</b></div>
+      <div class="best-line">⏰ أفضل الأوقات: <b>${blocksTxt}</b></div>
+      ${pd.note?`<div style="font-size:12.5px;color:var(--muted);margin-top:8px">📝 ${esc(pd.note)}</div>`:''}
+      <div class="heat" style="margin-top:12px"><table class="heat-tbl">${heatHTML(p.k,pd.grid)}</table></div>
+      <div class="form-row" style="margin-top:12px">
+        <div><label>متوسط المستخدمين النشطين (تقديري)</label><input value="${esc(pd.users)}" onchange="setMeta('${p.k}','users',this.value)" placeholder="مثال: ٢٠ مليون في السعودية"></div>
+        <div style="grid-column:2/-1"><label>ملاحظة أوقات الذروة</label><input value="${esc(pd.note)}" onchange="setMeta('${p.k}','note',this.value)"></div>
+      </div>`;
+    wrap.appendChild(sec);
+  });
+}
+function renderReco(d){
+  const el=document.getElementById('reco');
+  const chosen=PK_PLAT.filter(p=>pkChosen.has(p.k));
+  if(!chosen.length){ el.innerHTML=`<div style="font-size:14px">👆 اختر منصة أو أكثر ثم اضغط «بحث / عرض أفضل وقت».</div>`; return; }
+  const now=new Date(), td=now.getDay(), tbk=Math.floor(now.getHours()/4);
+  let best=-1, who=[];
+  chosen.forEach(p=>{const lv=d[p.k].grid[td][tbk]; if(lv>best){best=lv;who=[p];}else if(lv===best)who.push(p);});
+  const lvl=['منخفض','متوسط','مرتفع','ذروة'][best], when=`${PK_DAYS[td]} · ${PK_BLOCKS[tbk]}`;
+  if(best<=0){
+    el.innerHTML=`<div style="font-size:13px;color:var(--muted)">التوصية الآن (${when})</div>
+      <div class="big">النشاط منخفض حاليًا على المنصات المختارة</div>
+      <div style="font-size:13px;color:var(--muted)">يُفضّل تأجيل الإعلان المموّل إلى وقت ذروة.</div>`;
+  }else{
+    el.innerHTML=`<div style="font-size:13px;color:var(--muted)">التوصية الآن (${when})</div>
+      <div class="big">انشر على: ${who.map(p=>p.i+' '+p.n).join('  +  ')}</div>
+      <div style="font-size:13px;color:var(--muted)">مستوى النشاط المتوقع: <b style="color:var(--text)">${lvl}</b> — وقت مناسب${best===3?' جدًا':''} للإعلانات المموّلة.</div>`;
+  }
+}
+function pkCycle(key,d,b){ const data=pkLoad(); data[key].grid[d][b]=(data[key].grid[d][b]+1)%4; pkSave(data); renderView(); }
+function setMeta(key,field,val){ const data=pkLoad(); data[key][field]=val.trim(); pkSave(data); }
+function resetPeaks(){ if(!confirm('استرجاع القيم الافتراضية لكل المنصات؟'))return; pkSave(pkSeed()); renderView(); }
+
+/* ---- Platform requests (طلبات المنصة) ---- */
+function addReq(){
+  const desc=document.getElementById('rq-desc').value.trim();
+  if(!desc)return alert('اكتب وصف الطلب');
+  const arr=DB.get('rq'); arr.push({id:uid(),src:rq_src.value.trim()||'—',desc,status:rq_status.value,date:new Date().toISOString().slice(0,10)});
+  DB.set('rq',arr); rq_src.value=rq_desc.value=''; renderReq();
+}
+function renderReq(){
+  const arr=DB.get('rq').sort((a,b)=>b.date.localeCompare(a.date)), b=document.getElementById('rq-body');
+  b.innerHTML=arr.length?'':'<tr><td colspan="5" class="empty">لا توجد طلبات بعد.</td></tr>';
+  arr.forEach(x=>{
+    const sp=x.status==='منجز'?'in':x.status==='قيد المعالجة'?'g':'y';
+    b.innerHTML+=`<tr><td>${x.date}</td><td>${esc(x.src)}</td><td>${esc(x.desc)}</td>
+      <td><span class="pill ${sp}">${x.status}</span></td>
+      <td><button class="btn danger sm" onclick="del('rq','${x.id}',renderReq)">حذف</button></td></tr>`;
+  });
+}
+
+/* ---- Design files via IndexedDB (التصميم) ---- */
+const IDB={
+  _db:null,
+  open(){return new Promise((res,rej)=>{ if(IDB._db)return res(IDB._db);
+    const r=indexedDB.open('athar_design',1);
+    r.onupgradeneeded=e=>{const db=e.target.result; if(!db.objectStoreNames.contains('files'))db.createObjectStore('files',{keyPath:'id'});};
+    r.onsuccess=e=>{IDB._db=e.target.result;res(IDB._db);};
+    r.onerror=()=>rej(r.error);
+  });},
+  async add(rec){const db=await IDB.open();return new Promise((res,rej)=>{const t=db.transaction('files','readwrite');t.objectStore('files').put(rec);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});},
+  async all(){const db=await IDB.open();return new Promise((res,rej)=>{const rq=db.transaction('files','readonly').objectStore('files').getAll();rq.onsuccess=()=>res(rq.result||[]);rq.onerror=()=>rej(rq.error);});},
+  async del(id){const db=await IDB.open();return new Promise((res,rej)=>{const t=db.transaction('files','readwrite');t.objectStore('files').delete(id);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});}
+};
+let dzURLs=[];
+function fmtBytes(n){ n=n||0; if(n<1024)return n+' ب'; if(n<1048576)return (n/1024).toFixed(1)+' ك.ب'; if(n<1073741824)return (n/1048576).toFixed(1)+' م.ب'; return (n/1073741824).toFixed(2)+' ج.ب'; }
+function fileIcon(t){ t=(t||'').toLowerCase(); if(t.includes('pdf'))return '📕'; if(t.includes('word')||t.includes('document'))return '📝'; if(t.includes('sheet')||t.includes('excel')||t.includes('csv'))return '📊'; if(t.includes('presentation')||t.includes('powerpoint'))return '📈'; if(t.includes('zip')||t.includes('rar')||t.includes('compress'))return '🗜️'; if(t.startsWith('audio'))return '🎧'; if(t.startsWith('text'))return '📄'; return '📁'; }
+async function handleFiles(list){
+  try{ for(const f of list){ await IDB.add({id:uid(),name:f.name,type:f.type||'',size:f.size,date:Date.now(),blob:f}); } }
+  catch(e){ alert('تعذّر حفظ الملف: '+(e&&e.message||e)); }
+  renderDesign();
+}
+async function renderDesign(){
+  dzURLs.forEach(u=>URL.revokeObjectURL(u)); dzURLs=[];
+  let files=[]; try{ files=await IDB.all(); }catch(e){}
+  files.sort((a,b)=>b.date-a.date);
+  const grid=document.getElementById('files-grid');
+  document.getElementById('dz-count').textContent=files.length;
+  document.getElementById('dz-size').textContent=fmtBytes(files.reduce((s,f)=>s+(f.size||0),0));
+  const stf=document.getElementById('st-files'); if(stf)stf.textContent=files.length;
+  if(!files.length){ grid.innerHTML='<div class="empty" style="grid-column:1/-1">لا توجد ملفات بعد. ابدأ برفع تصاميمك.</div>'; return; }
+  grid.innerHTML='';
+  files.forEach(f=>{
+    const url=URL.createObjectURL(f.blob); dzURLs.push(url);
+    let thumb;
+    if((f.type||'').startsWith('image'))thumb=`<img src="${url}" alt="">`;
+    else if((f.type||'').startsWith('video'))thumb=`<video src="${url}" muted preload="metadata"></video>`;
+    else thumb=`<div class="fi">${fileIcon(f.type)}</div>`;
+    const kind=esc(((f.type||'ملف').split('/').pop())||'ملف');
+    const card=document.createElement('div'); card.className='file-card';
+    card.innerHTML=`<div class="file-thumb">${thumb}</div>
+      <div class="file-meta"><div class="nm">${esc(f.name)}</div>
+      <div class="sub">${fmtBytes(f.size)} · ${kind}</div>
+      <div class="file-actions">
+        <a class="btn ghost sm" href="${url}" download="${esc(f.name)}">⬇️ تنزيل</a>
+        <button class="btn ghost sm" onclick="window.open('${url}','_blank')">👁️ فتح</button>
+        <button class="btn danger sm" onclick="delFile('${f.id}')">حذف</button>
+      </div></div>`;
+    grid.appendChild(card);
+  });
+}
+async function delFile(id){ if(!confirm('حذف الملف؟'))return; try{await IDB.del(id);}catch(e){} renderDesign(); }
+function initDesign(){
+  const drop=document.getElementById('drop'), inp=document.getElementById('file-in');
+  drop.onclick=()=>inp.click();
+  inp.onchange=()=>{ if(inp.files.length)handleFiles(inp.files); inp.value=''; };
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag');}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag');}));
+  drop.addEventListener('drop',e=>{ if(e.dataTransfer.files.length)handleFiles(e.dataTransfer.files); });
+  renderDesign();
+}
+
+/* ---- Agenda: tasks & meetings + Gmail/Calendar (المهام والاجتماعات) ---- */
+const MY_EMAIL='s.999.alansary@gmail.com';
+function micToField(id){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const note=document.getElementById('ag-mic-note');
+  if(!SR){ note.textContent='⚠️ التسجيل الصوتي غير مدعوم في هذا المتصفح — استخدم Chrome أو Edge على سطح المكتب، أو اكتب يدويًا.'; return; }
+  const rec=new SR(); rec.lang='ar-SA'; rec.interimResults=false; rec.maxAlternatives=1;
+  note.textContent='🎙️ جارٍ الاستماع... تكلّم الآن';
+  rec.onresult=e=>{ const t=e.results[0][0].transcript; const el=document.getElementById(id); el.value=(el.value?el.value+' ':'')+t; note.textContent='✅ تم إدراج ما قلته.'; };
+  rec.onerror=e=>{ note.textContent='⚠️ تعذّر التسجيل: '+e.error+' (تأكّد من السماح باستخدام الميكروفون).'; };
+  rec.onend=()=>{ if(note.textContent.startsWith('🎙️'))note.textContent=''; };
+  try{ rec.start(); }catch(e){ note.textContent='⚠️ تعذّر بدء التسجيل.'; }
+}
+function addAgenda(){
+  const title=document.getElementById('ag-title').value.trim();
+  if(!title)return alert('اكتب العنوان أو سجّله صوتيًا');
+  const arr=DB.get('ag');
+  arr.push({id:uid(),type:ag_type.value,title,date:ag_date.value,time:ag_time.value,notes:ag_notes.value.trim(),done:false});
+  DB.set('ag',arr);
+  ag_title.value=ag_notes.value=''; document.getElementById('ag-mic-note').textContent='';
+  renderAgenda(); renderHome();
+}
+function agGCalLink(x){
+  const pad=n=>String(n).padStart(2,'0');
+  let start, end;
+  if(x.date){
+    const t=x.time||'09:00';
+    const s=new Date(x.date+'T'+t);
+    const e=new Date(s.getTime()+60*60*1000);
+    const fmtD=d=>d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'T'+pad(d.getHours())+pad(d.getMinutes())+'00';
+    start=fmtD(s); end=fmtD(e);
+  }
+  const base='https://calendar.google.com/calendar/render?action=TEMPLATE';
+  let u=base+'&text='+encodeURIComponent((x.type==='meeting'?'اجتماع: ':'مهمة: ')+x.title);
+  if(start&&end)u+='&dates='+start+'/'+end;
+  if(x.notes)u+='&details='+encodeURIComponent(x.notes);
+  return u;
+}
+function agMailLink(x){
+  const sub=encodeURIComponent((x.type==='meeting'?'اجتماع: ':'مهمة: ')+x.title);
+  const body=encodeURIComponent([x.title,x.date?('التاريخ: '+x.date+(x.time?(' الساعة '+x.time):'')):'',x.notes?('التفاصيل: '+x.notes):''].filter(Boolean).join('\n'));
+  return 'https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(MY_EMAIL)+'&su='+sub+'&body='+body;
+}
+function renderAgenda(){
+  const arr=DB.get('ag').sort((a,b)=>((a.date||'9999')+(a.time||'')).localeCompare((b.date||'9999')+(b.time||'')));
+  const el=document.getElementById('ag-list');
+  el.innerHTML=arr.length?'':'<div class="empty">لا توجد مهام أو اجتماعات بعد.</div>';
+  arr.forEach(x=>{
+    const icon=x.type==='meeting'?'👥':'✅';
+    const when=[x.date||'',x.time||''].filter(Boolean).join(' · ')||'بدون موعد محدّد';
+    el.innerHTML+=`<div class="card" style="${x.done?'opacity:.55':''}">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
+        <h3 style="margin:0;font-size:15px">${icon} ${esc(x.title)}</h3>
+        <span class="pill ${x.type==='meeting'?'g':'y'}">${x.type==='meeting'?'اجتماع':'مهمة'}</span>
+      </div>
+      <div style="font-size:12.5px;color:var(--muted);margin:8px 0">🕒 ${esc(when)}</div>
+      ${x.notes?`<p style="margin:0 0 10px;font-size:13px;color:#c7d3e0;line-height:1.7;white-space:pre-wrap">${esc(x.notes)}</p>`:''}
+      <div class="file-actions">
+        <a class="btn ghost sm" href="${agGCalLink(x)}" target="_blank">🗓️ تقويم Google</a>
+        <a class="btn ghost sm" href="${agMailLink(x)}" target="_blank">✉️ إرسال لبريدي</a>
+        <button class="btn ghost sm" onclick="toggleAg('${x.id}')">${x.done?'↩️ تراجع':'✔️ إنجاز'}</button>
+        <button class="btn danger sm" onclick="del('ag','${x.id}',renderAgenda)">حذف</button>
+      </div></div>`;
+  });
+}
+function toggleAg(id){ const arr=DB.get('ag'); const x=arr.find(a=>a.id===id); if(x)x.done=!x.done; DB.set('ag',arr); renderAgenda(); renderHome(); }
+
+/* ---- Secretary: letters (السكرتارية) ---- */
+const LT_TEMPLATES=[
+ {title:'خطاب طلب دعم / تبرع', body:`بسم الله الرحمن الرحيم\n\nالسادة/ ..................................... المحترمون\nالسلام عليكم ورحمة الله وبركاته، وبعد:\n\nيسرّ «مشروع أثر» الخيري — المعني بجمع التبرعات العينية وإعادة تدويرها لخدمة المحتاجين — أن يتقدّم لكم بأطيب التحيّات، آملين تكرّمكم بدعم مبادرتنا عبر (توفير مواد / رعاية حملة / تسهيل مهمة)، بما يسهم في تعظيم الأثر المجتمعي.\n\nونحن على استعداد لتزويدكم بأي بيانات أو تقارير تحتاجونها، شاكرين لكم حسن تعاونكم.\n\nوتفضلوا بقبول فائق الاحترام والتقدير،،\n\nإدارة مشروع أثر`},
+ {title:'خطاب شكر وتقدير', body:`بسم الله الرحمن الرحيم\n\nسعادة/ ..................................... المحترم\nالسلام عليكم ورحمة الله وبركاته، وبعد:\n\nيطيب لنا في «مشروع أثر» أن نرفع لكم خالص الشكر والتقدير على دعمكم الكريم ومساهمتكم الفاعلة في إنجاح مبادراتنا الخيرية، سائلين الله أن يجعله في ميزان حسناتكم.\n\nإن وقفتكم النبيلة كان لها أطيب الأثر، ونتطلّع لاستمرار هذا التعاون المثمر.\n\nوتفضلوا بقبول فائق الاحترام،،\n\nإدارة مشروع أثر`},
+ {title:'تفويض مندوب لاستلام التبرعات', body:`بسم الله الرحمن الرحيم\n\nإلى من يهمّه الأمر\nالسلام عليكم ورحمة الله وبركاته، وبعد:\n\nنفيدكم بأن حامل هذا الخطاب/ ..................................... — هوية رقم (...................) — مفوَّضٌ رسميًا من «مشروع أثر» باستلام التبرعات العينية نيابةً عنّا، اعتبارًا من تاريخه.\n\nنأمل تقديم التسهيلات اللازمة له، ولكم جزيل الشكر.\n\nإدارة مشروع أثر`},
+ {title:'مخاطبة جهة حكومية (تسهيل مهمة)', body:`بسم الله الرحمن الرحيم\n\nمعالي/ سعادة ..................................... المحترم\nالسلام عليكم ورحمة الله وبركاته، وبعد:\n\nنظرًا لما يقوم به «مشروع أثر» من دورٍ خدميّ في جمع التبرعات العينية وإعادة تدويرها، نأمل من سعادتكم التكرّم بالموافقة على (تصريح / تسهيل مهمة / توفير موقع)، لتمكيننا من أداء عملنا على الوجه الأمثل.\n\nآملين تعاونكم، ولكم منّا وافر الشكر والتقدير.\n\nإدارة مشروع أثر`},
+ {title:'طلب شراكة / تعاون', body:`بسم الله الرحمن الرحيم\n\nالسادة/ ..................................... المحترمون\nالسلام عليكم ورحمة الله وبركاته، وبعد:\n\nيتشرّف «مشروع أثر» بدعوتكم لعقد شراكة مجتمعية تخدم أهدافنا المشتركة في العمل الخيري والاستدامة، عبر (رعاية / تنفيذ برنامج / دعم لوجستي)، بما يحقّق أثرًا ملموسًا للطرفين.\n\nويسعدنا ترتيب لقاء لمناقشة التفاصيل، شاكرين لكم اهتمامكم.\n\nوتفضلوا بقبول فائق الاحترام،،\n\nإدارة مشروع أثر`}
+];
+function scDate(){return document.getElementById('sc-date');}
+function renderSecretary(){
+  const tw=document.getElementById('sc-templates'); tw.innerHTML='';
+  LT_TEMPLATES.forEach((t,i)=>{
+    const c=document.createElement('div'); c.className='card';
+    c.innerHTML=`<h3 style="margin:0 0 8px;font-size:14.5px">📄 ${esc(t.title)}</h3>
+      <p style="margin:0 0 10px;font-size:12.5px;color:var(--muted);line-height:1.7;max-height:66px;overflow:hidden">${esc(t.body.slice(0,120))}…</p>
+      <button class="btn ghost sm" onclick="useTemplate(${i})">استخدام كنموذج</button>`;
+    tw.appendChild(c);
+  });
+  const arr=DB.get('lt').sort((a,b)=>(b.date||'').localeCompare(a.date||'')), b=document.getElementById('sc-body-list');
+  document.getElementById('sc-count').textContent=arr.length;
+  b.innerHTML=arr.length?'':'<tr><td colspan="5" class="empty">لا توجد خطابات محفوظة بعد.</td></tr>';
+  arr.forEach(x=>{
+    const sp=x.status==='مُرسل'?'in':x.status==='جاهز'?'g':'y';
+    b.innerHTML+=`<tr><td>${x.date||'—'}</td><td>${esc(x.title)}</td><td>${esc(x.to)||'—'}</td>
+      <td><span class="pill ${sp}">${x.status}</span></td>
+      <td class="row-actions">
+        <button class="btn ghost sm" onclick="editLetter('${x.id}')">تعديل</button>
+        <button class="btn ghost sm" onclick="dupLetter('${x.id}')">نسخ</button>
+        <button class="btn danger sm" onclick="del('lt','${x.id}',renderSecretary)">حذف</button>
+      </td></tr>`;
+  });
+}
+function useTemplate(i){
+  const t=LT_TEMPLATES[i];
+  document.getElementById('sc-id').value='';
+  document.getElementById('sc-title').value=t.title;
+  document.getElementById('sc-to').value=''; document.getElementById('sc-ref').value='';
+  document.getElementById('sc-body').value=t.body;
+  document.getElementById('sc-status').value='مسودة';
+  scDate().value=new Date().toISOString().slice(0,10);
+  document.getElementById('sc-editor-title').textContent='كتابة خطاب جديد (من نموذج: '+t.title+')';
+  document.getElementById('sc-title').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function newLetter(){
+  ['sc-id','sc-title','sc-to','sc-ref','sc-body'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('sc-status').value='مسودة';
+  scDate().value=new Date().toISOString().slice(0,10);
+  document.getElementById('sc-editor-title').textContent='كتابة خطاب جديد';
+}
+function saveLetter(){
+  const title=document.getElementById('sc-title').value.trim();
+  const body=document.getElementById('sc-body').value.trim();
+  if(!title)return alert('اكتب عنوان/موضوع الخطاب');
+  if(!body)return alert('اكتب نص الخطاب');
+  const rec={id:document.getElementById('sc-id').value||uid(),title,to:document.getElementById('sc-to').value.trim(),
+    ref:document.getElementById('sc-ref').value.trim(),date:scDate().value||new Date().toISOString().slice(0,10),
+    status:document.getElementById('sc-status').value,body};
+  const arr=DB.get('lt'), idx=arr.findIndex(x=>x.id===rec.id);
+  if(idx>=0)arr[idx]=rec; else arr.push(rec);
+  DB.set('lt',arr); document.getElementById('sc-id').value=rec.id;
+  alert('تم حفظ الخطاب ✅'); renderSecretary();
+}
+function editLetter(id){
+  const x=DB.get('lt').find(l=>l.id===id); if(!x)return;
+  document.getElementById('sc-id').value=x.id;
+  document.getElementById('sc-title').value=x.title;
+  document.getElementById('sc-to').value=x.to||'';
+  document.getElementById('sc-ref').value=x.ref||'';
+  document.getElementById('sc-body').value=x.body||'';
+  document.getElementById('sc-status').value=x.status||'مسودة';
+  scDate().value=x.date||'';
+  document.getElementById('sc-editor-title').textContent='تعديل الخطاب';
+  document.getElementById('sc-title').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function dupLetter(id){
+  const x=DB.get('lt').find(l=>l.id===id); if(!x)return;
+  const arr=DB.get('lt'); arr.push({...x,id:uid(),title:x.title+' (نسخة)',status:'مسودة',date:new Date().toISOString().slice(0,10)});
+  DB.set('lt',arr); renderSecretary();
+}
+function letterHTML(){
+  const g=id=>document.getElementById(id).value.trim();
+  const title=esc(g('sc-title')), to=esc(g('sc-to')), ref=esc(g('sc-ref')), date=esc(scDate().value||'');
+  const body=esc(document.getElementById('sc-body').value).replace(/\n/g,'<br>');
+  return `<div style="font-family:'Segoe UI',Tahoma,sans-serif;direction:rtl;padding:40px;max-width:800px;margin:auto;color:#111;line-height:2">
+    <div style="text-align:center;border-bottom:2px solid #1f8f6f;padding-bottom:12px;margin-bottom:24px">
+      <h2 style="margin:0;color:#1f8f6f">مشروع أثر الخيري</h2>
+      <div style="font-size:12px;color:#555">مشروع جمع التبرعات العينية</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:#333;margin-bottom:20px">
+      <span>${ref?('المرجع: '+ref):''}</span><span>${date?('التاريخ: '+date):''}</span>
+    </div>
+    ${to?`<div style="margin-bottom:10px"><b>${to}</b></div>`:''}
+    <h3 style="margin:0 0 16px">الموضوع: ${title}</h3>
+    <div style="font-size:15px">${body}</div>
+  </div>`;
+}
+function printLetter(){
+  if(!document.getElementById('sc-body').value.trim())return alert('لا يوجد نص لطباعته');
+  const w=window.open('','_blank');
+  w.document.write('<html dir="rtl"><head><meta charset="UTF-8"><title>'+esc(document.getElementById('sc-title').value||'خطاب')+'</title></head><body>'+letterHTML()+'</body></html>');
+  w.document.close(); w.focus(); setTimeout(()=>w.print(),350);
+}
+function exportLetterDoc(){
+  if(!document.getElementById('sc-body').value.trim())return alert('لا يوجد نص لتصديره');
+  const html='<html dir="rtl"><head><meta charset="UTF-8"></head><body>'+letterHTML()+'</body></html>';
+  const blob=new Blob(['﻿'+html],{type:'application/msword'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=(document.getElementById('sc-title').value.trim()||'خطاب')+'.doc'; a.click();
+}
+
+/* ---- Feasibility study & data analysis (دراسة الجدوى والتحليل) ---- */
+let FEAS=null, ST_TABLE=null;
+function stTab(which,btn){
+  document.querySelectorAll('#st-tabs button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('st-feas').style.display=which==='feas'?'':'none';
+  document.getElementById('st-anal').style.display=which==='anal'?'':'none';
+  document.getElementById('st-gen').style.display=which==='gen'?'':'none';
+}
+/* SVG charts (single hue + direct labels + table view = compliant secondary encoding) */
+function nfmt(v){ return Number(Math.round(v)).toLocaleString('en-US'); }
+function svgBars(items,opts){
+  opts=opts||{}; const n=items.length||1, W=Math.max(300,n*100), H=250, top=26, bottom=H-46, plotH=bottom-top;
+  const vals=items.map(i=>i.value), maxV=Math.max(0,...vals), minV=Math.min(0,...vals), range=(maxV-minV)||1;
+  const yOf=v=>bottom-(v-minV)/range*plotH, zeroY=yOf(0), gap=W/n, bw=Math.min(58,gap*0.5);
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px" role="img" aria-label="رسم أعمدة">`;
+  s+=`<line x1="0" y1="${zeroY.toFixed(1)}" x2="${W}" y2="${zeroY.toFixed(1)}" stroke="var(--line)" stroke-width="1.5"/>`;
+  items.forEach((it,i)=>{
+    const cx=gap*i+gap/2, y=yOf(it.value), yy=Math.min(y,zeroY), h=Math.max(1,Math.abs(y-zeroY));
+    const col=it.neg?'var(--expense)':(opts.color||'var(--brand)');
+    const lab=(it.label||'').length>12?(it.label.slice(0,11)+'…'):(it.label||'');
+    s+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${col}"><title>${esc(it.label||'')}: ${nfmt(it.value)} ${esc(opts.unit||'')}</title></rect>`;
+    const ly=it.value>=0?yy-8:yy+h+15;
+    s+=`<text x="${cx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--text)">${nfmt(it.value)}</text>`;
+    s+=`<text x="${cx.toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="12" fill="var(--muted)">${esc(lab)}</text>`;
+  });
+  return s+'</svg>';
+}
+function svgLine(pts,opts){
+  opts=opts||{}; const W=Math.max(320,pts.length*44), H=250, left=10, right=10, top=22, bottom=H-30, plotH=bottom-top, plotW=W-left-right;
+  const ys=pts.map(p=>p.y), maxV=Math.max(0,...ys), minV=Math.min(0,...ys), range=(maxV-minV)||1;
+  const xOf=i=>left+(i/((pts.length-1)||1))*plotW, yOf=v=>bottom-(v-minV)/range*plotH, zeroY=yOf(0);
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px" role="img" aria-label="التدفق النقدي التراكمي">`;
+  s+=`<line x1="${left}" y1="${zeroY.toFixed(1)}" x2="${W-right}" y2="${zeroY.toFixed(1)}" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 4"/>`;
+  const d=pts.map((p,i)=>`${i?'L':'M'}${xOf(i).toFixed(1)} ${yOf(p.y).toFixed(1)}`).join(' ');
+  s+=`<path d="${d}" fill="none" stroke="var(--brand)" stroke-width="2.5"/>`;
+  const step=Math.ceil(pts.length/12)||1;
+  pts.forEach((p,i)=>{ if(i%step===0||i===pts.length-1)s+=`<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(p.y).toFixed(1)}" r="3.5" fill="var(--brand)"><title>${esc((opts.xpref||'')+p.x)}: ${nfmt(p.y)} ${esc(opts.unit||'')}</title></circle>`; });
+  if(opts.payback){ const xi=Math.min(opts.payback,pts.length-1), x=xOf(xi);
+    s+=`<line x1="${x.toFixed(1)}" y1="${top}" x2="${x.toFixed(1)}" y2="${bottom}" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+    s+=`<text x="${x.toFixed(1)}" y="${(top-7).toFixed(1)}" text-anchor="middle" font-size="11" fill="var(--warn)">استرداد ≈ ${Math.ceil(opts.payback)} شهر</text>`; }
+  return s+'</svg>';
+}
+/* Feasibility */
+function feasLoad(){ try{const d=JSON.parse(localStorage.getItem('athar_feas')); if(d&&d.capital)return d;}catch(e){} return {name:'',months:12,capital:[{t:'',a:0}],opex:[{t:'',a:0}],rev:[{t:'',a:0}]}; }
+function feasSave(d){ localStorage.setItem('athar_feas',JSON.stringify(d)); }
+function feasName(v){ FEAS.name=v; feasSave(FEAS); }
+function feasMonths(v){ FEAS.months=Math.max(1,+v||12); feasSave(FEAS); computeFeas(); }
+function feasAdd(list){ FEAS[list].push({t:'',a:0}); feasSave(FEAS); renderFeas(); }
+function feasDel(list,i){ FEAS[list].splice(i,1); if(!FEAS[list].length)FEAS[list].push({t:'',a:0}); feasSave(FEAS); renderFeas(); }
+function feasSet(list,i,field,val){ FEAS[list][i][field]=field==='a'?(+val||0):val; feasSave(FEAS); computeFeas(); }
+function sum(a){ return a.reduce((s,x)=>s+(+x.a||0),0); }
+function listTable(list,title){
+  let h=`<h3 class="sec-title">${title} <button class="btn ghost sm" style="margin-inline-start:10px" onclick="feasAdd('${list}')">＋ بند</button></h3>
+  <div class="tbl-wrap"><table><thead><tr><th>البند</th><th style="width:170px">المبلغ (ريال)</th><th style="width:60px"></th></tr></thead><tbody>`;
+  FEAS[list].forEach((r,i)=>{
+    h+=`<tr><td><input value="${esc(r.t)}" onchange="feasSet('${list}',${i},'t',this.value)" placeholder="اسم البند"></td>
+    <td><input type="number" min="0" value="${r.a||''}" onchange="feasSet('${list}',${i},'a',this.value)" placeholder="0"></td>
+    <td><button class="btn danger sm" onclick="feasDel('${list}',${i})">حذف</button></td></tr>`;
+  });
+  return h+'</tbody></table></div>';
+}
+function renderFeas(){
+  document.getElementById('st-feas-lists').innerHTML=
+    listTable('capital','التكاليف الرأسمالية (لمرة واحدة)')+
+    listTable('opex','التكاليف التشغيلية الشهرية')+
+    listTable('rev','الإيراد الشهري المتوقّع');
+  document.getElementById('st-fname').value=FEAS.name||'';
+  document.getElementById('st-fmonths').value=FEAS.months||12;
+  computeFeas();
+}
+function computeFeas(){
+  const cap=sum(FEAS.capital), opex=sum(FEAS.opex), rev=sum(FEAS.rev), net=rev-opex;
+  const margin=rev>0?(net/rev*100):0, payback=net>0?Math.ceil(cap/net):null, roi=cap>0?(net*12/cap*100):0;
+  const tiles=[
+    ['إجمالي التكلفة الرأسمالية',nfmt(cap)+' ريال'],
+    ['التشغيل الشهري',nfmt(opex)+' ريال'],
+    ['الإيراد الشهري',nfmt(rev)+' ريال'],
+    ['صافي الربح الشهري',(net>=0?'+':'')+nfmt(net)+' ريال'],
+    ['هامش الربح',margin.toFixed(1)+'%'],
+    ['نقطة التعادل الشهرية',nfmt(opex)+' ريال'],
+    ['فترة الاسترداد',payback?(payback+' شهرًا'):'—'],
+    ['العائد السنوي ROI',roi.toFixed(1)+'%']
+  ];
+  document.getElementById('st-kpis').innerHTML=tiles.map(t=>`<div class="stat"><div class="v" style="font-size:18px">${t[1]}</div><div class="l">${t[0]}</div></div>`).join('');
+  document.getElementById('st-feas-bars').innerHTML=svgBars([
+    {label:'الإيراد',value:rev},{label:'التشغيل',value:opex},{label:'الصافي',value:net,neg:net<0}
+  ],{unit:'ريال'});
+  const pts=[]; for(let m=0;m<=FEAS.months;m++)pts.push({x:m,y:-cap+net*m});
+  document.getElementById('st-feas-line').innerHTML=svgLine(pts,{payback:net>0?cap/net:null,unit:'ريال',xpref:'الشهر '});
+}
+/* General analyzer */
+function isNum(v){ v=String(v).trim(); return v!==''&&!isNaN(+v.replace(/,/g,'')); }
+function toNum(v){ return +String(v).replace(/,/g,'')||0; }
+function stParse(){
+  const raw=document.getElementById('st-paste').value.trim();
+  if(!raw)return alert('الصق البيانات أولًا');
+  const lines=raw.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2)return alert('أدخل صف عناوين وصفًا واحدًا على الأقل');
+  const delim=raw.includes('\t')?'\t':((raw.includes(';')&&!raw.includes(','))?';':',');
+  const rows=lines.map(l=>l.split(delim).map(c=>c.trim()));
+  const headers=rows.shift();
+  ST_TABLE={headers,rows};
+  renderAnal();
+}
+function renderAnal(){
+  if(!ST_TABLE)return;
+  const {headers,rows}=ST_TABLE;
+  let t='<div class="tbl-wrap"><table><thead><tr>'+headers.map(h=>`<th>${esc(h)}</th>`).join('')+'</tr></thead><tbody>';
+  rows.forEach(r=>{ t+='<tr>'+headers.map((h,i)=>`<td>${esc(r[i]||'')}</td>`).join('')+'</tr>'; });
+  document.getElementById('st-anal-table').innerHTML=t+'</tbody></table></div>';
+  let stats='<div class="tbl-wrap"><table><thead><tr><th>العمود</th><th>العدد</th><th>المجموع</th><th>المتوسط</th><th>الأدنى</th><th>الأعلى</th></tr></thead><tbody>';
+  const numCols=[];
+  headers.forEach((h,ci)=>{
+    const nums=rows.map(r=>r[ci]).filter(v=>v!==undefined&&isNum(v)).map(toNum);
+    if(nums.length){ numCols.push({h,ci});
+      const s=nums.reduce((a,b)=>a+b,0), avg=s/nums.length;
+      const f=x=>Number(Math.round(x*100)/100).toLocaleString('en-US');
+      stats+=`<tr><td>${esc(h)}</td><td>${nums.length}</td><td>${f(s)}</td><td>${f(avg)}</td><td>${f(Math.min(...nums))}</td><td>${f(Math.max(...nums))}</td></tr>`;
+    }
+  });
+  document.getElementById('st-anal-stats').innerHTML=numCols.length?(stats+'</tbody></table></div>'):'<p class="empty">لا توجد أعمدة رقمية للتحليل.</p>';
+  const labSel=document.getElementById('st-lab'), valSel=document.getElementById('st-val');
+  labSel.innerHTML=headers.map((h,i)=>`<option value="${i}">${esc(h)}</option>`).join('');
+  valSel.innerHTML=numCols.map(c=>`<option value="${c.ci}">${esc(c.h)}</option>`).join('');
+  if(numCols.length){ renderAnalChart(); } else document.getElementById('st-anal-chart').innerHTML='';
+}
+function renderAnalChart(){
+  if(!ST_TABLE)return;
+  const li=+document.getElementById('st-lab').value||0, vi=+document.getElementById('st-val').value||0;
+  const items=ST_TABLE.rows.slice(0,12).map(r=>({label:r[li]||'—',value:toNum(r[vi])}));
+  document.getElementById('st-anal-chart').innerHTML=items.length?svgBars(items,{}):'';
+}
+function stDl(text,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:'text/csv'})); a.download=name; a.click(); }
+function stExport(){
+  const feasActive=document.getElementById('st-feas').style.display!=='none';
+  if(feasActive){
+    let csv='﻿دراسة الجدوى,"'+(FEAS.name||'')+'"\n\nالتكاليف الرأسمالية,المبلغ\n';
+    FEAS.capital.forEach(r=>csv+=`"${r.t}",${r.a||0}\n`);
+    csv+='\nالتشغيل الشهري,المبلغ\n'; FEAS.opex.forEach(r=>csv+=`"${r.t}",${r.a||0}\n`);
+    csv+='\nالإيراد الشهري,المبلغ\n'; FEAS.rev.forEach(r=>csv+=`"${r.t}",${r.a||0}\n`);
+    const cap=sum(FEAS.capital),opex=sum(FEAS.opex),rev=sum(FEAS.rev),net=rev-opex;
+    csv+=`\nالمؤشرات,\nإجمالي رأسمالي,${cap}\nتشغيل شهري,${opex}\nإيراد شهري,${rev}\nصافي شهري,${net}\nهامش الربح %,${rev>0?(net/rev*100).toFixed(1):0}\n`;
+    stDl(csv,'دراسة-جدوى.csv');
+  } else {
+    if(!ST_TABLE)return alert('لا توجد بيانات محلّلة للتصدير');
+    const csv='﻿'+ST_TABLE.headers.map(h=>`"${(h||'').replace(/"/g,'""')}"`).join(',')+'\n'+
+      ST_TABLE.rows.map(r=>ST_TABLE.headers.map((h,i)=>`"${(r[i]||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+    stDl(csv,'بيانات-محلّلة.csv');
+  }
+}
+
+/* ---- Generator by request (مولّد حسب الطلب) ---- */
+let GEN_TABLE=null;
+function genParse(){
+  const raw=document.getElementById('gn-data').value.trim();
+  if(!raw){GEN_TABLE=null;return null;}
+  const lines=raw.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2){GEN_TABLE=null;return null;}
+  const delim=raw.includes('\t')?'\t':((raw.includes(';')&&!raw.includes(','))?';':',');
+  const rows=lines.map(l=>l.split(delim).map(c=>c.trim()));
+  const headers=rows.shift(); GEN_TABLE={headers,rows}; return GEN_TABLE;
+}
+function genFields(){
+  const t=document.getElementById('gn-type').value, needCols=(t==='bar'||t==='line'||t==='auto');
+  genParse();
+  document.getElementById('gn-lab-wrap').style.display=needCols?'':'none';
+  document.getElementById('gn-val-wrap').style.display=needCols?'':'none';
+  if(needCols&&GEN_TABLE){
+    const {headers,rows}=GEN_TABLE;
+    const numCols=headers.map((h,i)=>({h,i})).filter(c=>rows.some(r=>isNum(r[c.i])));
+    document.getElementById('gn-lab').innerHTML=headers.map((h,i)=>`<option value="${i}">${esc(h)}</option>`).join('');
+    document.getElementById('gn-val').innerHTML=numCols.map(c=>`<option value="${c.i}">${esc(c.h)}</option>`).join('');
+  }
+}
+function genTableHTML(){
+  const {headers,rows}=GEN_TABLE;
+  let t='<div class="tbl-wrap"><table><thead><tr>'+headers.map(h=>`<th>${esc(h)}</th>`).join('')+'</tr></thead><tbody>';
+  rows.forEach(r=>{ t+='<tr>'+headers.map((h,i)=>`<td>${esc(r[i]||'')}</td>`).join('')+'</tr>'; });
+  return t+'</tbody></table></div>';
+}
+function genKPIHTML(){
+  const {headers,rows}=GEN_TABLE; let tiles='';
+  headers.forEach((h,i)=>{
+    const nums=rows.map(r=>r[i]).filter(v=>isNum(v)).map(toNum);
+    if(nums.length){ const s=nums.reduce((a,b)=>a+b,0);
+      tiles+=`<div class="stat"><div class="v" style="font-size:18px">${nfmt(s)}</div><div class="l">مجموع ${esc(h)}</div></div>`;
+      tiles+=`<div class="stat"><div class="v" style="font-size:18px">${nfmt(s/nums.length)}</div><div class="l">متوسط ${esc(h)}</div></div>`;
+    }
+  });
+  return tiles?`<div class="stat-row">${tiles}</div>`:'<p class="empty">لا توجد أعمدة رقمية.</p>';
+}
+function genBuild(){
+  const title=document.getElementById('gn-title').value.trim(), res=document.getElementById('gn-result');
+  genParse();
+  let t=document.getElementById('gn-type').value;
+  let out=title?`<h3 class="sec-title">${esc(title)}</h3>`:'';
+  const needData=(t!=='auto')?true:true;
+  if(t==='auto'){
+    if(!GEN_TABLE){res.innerHTML='<p class="empty">الصق بيانات أولًا للاختيار التلقائي.</p>';return;}
+    t=GEN_TABLE.headers.some((h,i)=>GEN_TABLE.rows.some(r=>isNum(r[i])))?'bar':'table';
+  }
+  if(!GEN_TABLE){res.innerHTML='<p class="empty">الصق بيانات لعرض المخرج المطلوب.</p>';return;}
+  if(t==='table'){ out+=genTableHTML(); }
+  else if(t==='kpi'){ out+=genKPIHTML(); }
+  else if(t==='bar'||t==='line'){
+    const li=+document.getElementById('gn-lab').value||0, vi=+document.getElementById('gn-val').value||0;
+    const items=GEN_TABLE.rows.slice(0,24).map(r=>({label:r[li]||'—',value:toNum(r[vi])}));
+    const chart=(t==='bar')?svgBars(items,{}):svgLine(items.map(it=>({x:it.label,y:it.value})),{});
+    out+=`<div class="card" style="overflow-x:auto">${chart}</div>`+genTableHTML();
+  }
+  res.innerHTML=out;
+}
+function saveReq(){
+  const v=document.getElementById('gn-req').value.trim(); if(!v)return alert('اكتب طلبك أولًا');
+  const arr=DB.get('dreq'); arr.push({id:uid(),text:v,date:new Date().toISOString().slice(0,10)});
+  DB.set('dreq',arr); document.getElementById('gn-req').value=''; renderReqList();
+}
+function renderReqList(){
+  const arr=DB.get('dreq').sort((a,b)=>b.date.localeCompare(a.date)), el=document.getElementById('gn-req-list');
+  el.innerHTML=arr.length?'':'<p style="font-size:12px;color:var(--muted);margin:8px 0 0">لا توجد طلبات محفوظة بعد.</p>';
+  arr.forEach(x=>{ el.innerHTML+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin-top:8px;font-size:13px;line-height:1.7">
+    <div style="color:var(--muted);font-size:11px;margin-bottom:3px">${x.date}</div>${esc(x.text)}
+    <div style="margin-top:6px"><button class="btn danger sm" onclick="del('dreq','${x.id}',renderReqList)">حذف</button></div></div>`; });
+}
+
+/* ---- Auth & roles (صلاحيات تنظيمية مؤقتة) ---- */
+const SECTIONS=[
+  {v:'home',n:'الرئيسية'},{v:'marketing',n:'التسويق (والذروة والطلبات)'},{v:'design',n:'التصميم'},
+  {v:'agenda',n:'المهام والاجتماعات'},{v:'secretary',n:'السكرتارية'},{v:'study',n:'دراسة الجدوى والتحليل'},{v:'biz',n:'تطوير العمل'},
+  {v:'acc',n:'المحاسب المبسّط'},{v:'research',n:'البحث'}
+];
+const ROLES=[{k:'admin',n:'مدير'},{k:'employee',n:'موظف'},{k:'secretary',n:'سكرتير'}];
+const ACCESS_DEFAULT={ admin:SECTIONS.map(s=>s.v), employee:['home','marketing','design','agenda'], secretary:['home','secretary','agenda','design'] };
+function accGet(){ try{const d=JSON.parse(localStorage.getItem('athar_access')); if(d&&d.admin)return d;}catch(e){} return JSON.parse(JSON.stringify(ACCESS_DEFAULT)); }
+function accSet(d){ localStorage.setItem('athar_access',JSON.stringify(d)); }
+function passGet(){ try{return JSON.parse(localStorage.getItem('athar_pass'))||{};}catch(e){return {};} }
+function passSet(d){ localStorage.setItem('athar_pass',JSON.stringify(d)); }
+function sessGet(){ try{return JSON.parse(localStorage.getItem('athar_session'));}catch(e){return null;} }
+function roleName(k){ const r=ROLES.find(r=>r.k===k); return r?r.n:k; }
+function allowedFor(role){
+  const acc=accGet();
+  let list=(role==='admin')?SECTIONS.map(s=>s.v):(acc[role]||[]).slice();
+  if(list.includes('marketing'))list.push('peaks','requests');
+  return list;
+}
+function applyAccess(){
+  CUR=sessGet(); if(!CUR)return;
+  const allowed=allowedFor(CUR.role);
+  document.querySelectorAll('#nav button').forEach(b=>{ b.style.display=allowed.includes(b.dataset.view)?'':'none'; });
+  document.getElementById('sess-info').innerHTML=`👤 ${esc(CUR.name)} <span style="opacity:.7">(${roleName(CUR.role)})</span>`;
+  document.getElementById('btn-access').style.display=CUR.role==='admin'?'':'none';
+  const active=document.querySelector('.view.active');
+  const curV=active?active.id.replace('view-',''):'home';
+  if(!allowed.includes(curV))show(allowed[0]||'home');
+}
+function initAuth(){
+  const roleSel=document.getElementById('lg-role');
+  roleSel.onchange=()=>{ const p=passGet(); document.getElementById('lg-pass-wrap').style.display=p[roleSel.value]?'':'none'; };
+  if(sessGet()){ document.getElementById('sess-box').style.display='block'; applyAccess(); }
+  else { document.getElementById('login-ov').style.display='grid'; roleSel.onchange(); }
+}
+function doLogin(){
+  const name=document.getElementById('lg-name').value.trim();
+  const role=document.getElementById('lg-role').value;
+  const pass=document.getElementById('lg-pass').value;
+  const err=document.getElementById('lg-err');
+  if(!name){err.textContent='اكتب اسمك';return;}
+  const p=passGet();
+  if(p[role]&&p[role]!==pass){err.textContent='رمز الدخول غير صحيح';return;}
+  localStorage.setItem('athar_session',JSON.stringify({name,role}));
+  document.getElementById('login-ov').style.display='none';
+  document.getElementById('sess-box').style.display='block';
+  applyAccess(); show('home');
+}
+function logout(){ localStorage.removeItem('athar_session'); location.reload(); }
+function openAccess(){
+  const acc=accGet(), p=passGet(), g=document.getElementById('access-grid'); g.innerHTML='';
+  ROLES.forEach(r=>{
+    const allowed=(r.k==='admin')?SECTIONS.map(s=>s.v):(acc[r.k]||[]);
+    const checks=SECTIONS.map(s=>`<label><input type="checkbox" data-role="${r.k}" value="${s.v}" ${allowed.includes(s.v)?'checked':''} ${r.k==='admin'?'disabled':''}> ${esc(s.n)}</label>`).join('');
+    g.innerHTML+=`<div class="acc-role"><h4>${r.n}${r.k==='admin'?' — كل الصلاحيات':''}</h4>
+      <div class="acc-checks">${checks}</div>
+      <div style="margin-top:10px"><label style="font-size:12px;color:var(--muted)">رمز الدخول (اختياري)</label>
+      <input data-pass="${r.k}" type="text" value="${esc(p[r.k]||'')}" placeholder="بدون رمز"></div></div>`;
+  });
+  document.getElementById('access-ov').style.display='grid';
+}
+function closeAccess(){ document.getElementById('access-ov').style.display='none'; }
+function saveAccess(){
+  const acc=accGet();
+  ROLES.forEach(r=>{ if(r.k==='admin')return; acc[r.k]=[...document.querySelectorAll('#access-grid input[type=checkbox][data-role="'+r.k+'"]:checked')].map(i=>i.value); });
+  accSet(acc);
+  const p={}; document.querySelectorAll('#access-grid input[data-pass]').forEach(i=>{ if(i.value.trim())p[i.dataset.pass]=i.value.trim(); });
+  passSet(p);
+  closeAccess(); applyAccess(); alert('تم حفظ الصلاحيات ✅');
+}
+
+/* init */
+document.getElementById('ac-date').value=new Date().toISOString().slice(0,10);
+FEAS=feasLoad();renderFeas();renderReqList();
+renderMk();renderBz();renderAcc();renderRs();renderReq();renderPeaks();initDesign();renderAgenda();newLetter();renderSecretary();renderHome();initAuth();
+</script>
+</body>
+</html>

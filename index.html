@@ -487,7 +487,7 @@
 </div>
 
 <!-- Login overlay -->
-<div id="login-ov" class="ov" style="display:none">
+<div id="login-ov" class="ov" style="display:grid">
   <div class="ov-box">
     <div class="brand" style="justify-content:center;margin-bottom:16px">
       <div class="logo">أ</div><div><h1>مشروع أثر</h1><small>تسجيل الدخول</small></div>
@@ -1297,11 +1297,14 @@ function initAuth(){
   auth.onAuthStateChanged(async user=>{
     if(user){
       const email=(user.email||'').toLowerCase();
-      const role=await loadRole(email);
-      CUR={email,role,name:email.split('@')[0]};
+      // كشف اللوحة فورًا (قبل جلب الدور) حتى لا يعلق أي انتظار
       document.getElementById('login-ov').style.display='none';
       document.getElementById('sess-box').style.display='block';
-      applyAccess(); show('home');
+      CUR={email,role:'employee',name:email.split('@')[0]};
+      applyAccess();
+      let role='employee';
+      try{ role=await loadRole(email); }catch(e){}
+      CUR.role=role; applyAccess();
     }else{
       CUR=null;
       document.getElementById('sess-box').style.display='none';

@@ -510,6 +510,16 @@
   </div>
 </div>
 
+<!-- Visible error surface (تشخيص بدون Console) -->
+<script>
+(function(){
+  function showErr(m){ var el=document.getElementById('lg-err'); if(el){ el.style.display='block'; el.style.whiteSpace='pre-wrap'; el.textContent=String(m); } }
+  window.__showErr=showErr;
+  window.onerror=function(msg,src,line){ showErr('⚠️ خطأ يمنع التشغيل: '+msg+(line?(' — سطر '+line):'')); return false; };
+  window.addEventListener('unhandledrejection',function(ev){ var r=ev.reason; showErr('⚠️ '+((r&&r.message)?r.message:r)); });
+})();
+</script>
+
 <!-- Firebase SDK (compat) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -518,8 +528,14 @@
 <script>
 /* ---- Firebase init ---- */
 const firebaseConfig={apiKey:"AIzaSyAOD5VhRc6s4eZHyeOKMiWDYYJG6dVYBlE",authDomain:"athar-dashboard.firebaseapp.com",projectId:"athar-dashboard",storageBucket:"athar-dashboard.firebasestorage.app",messagingSenderId:"509007437620",appId:"1:509007437620:web:391363cc87ab9f47488f61"};
-firebase.initializeApp(firebaseConfig);
-const auth=firebase.auth(), fdb=firebase.firestore();
+let auth=null, fdb=null;
+try{
+  if(typeof firebase==='undefined')throw new Error('لم تُحمّل مكتبة Firebase (تأكّد من اتصال الإنترنت)');
+  firebase.initializeApp(firebaseConfig);
+  auth=firebase.auth(); fdb=firebase.firestore();
+}catch(e){
+  (window.__showErr||function(m){alert(m);})('⚠️ تعذّر الاتصال بـ Firebase: '+(e&&e.message||e)+'. حدّث الصفحة (Ctrl+Shift+R).');
+}
 const OWNER_EMAIL='s.999.alansary@gmail.com';
 const DB={
   get:(k)=>JSON.parse(localStorage.getItem('athar_'+k)||'[]'),
@@ -1294,6 +1310,7 @@ async function loadRole(email){
   catch(e){ return 'employee'; }
 }
 function initAuth(){
+  if(!auth){ if(window.__showErr)window.__showErr('⚠️ لا يمكن تسجيل الدخول: تعذّر الاتصال بـ Firebase. حدّث الصفحة (Ctrl+Shift+R) وتأكّد من الإنترنت.'); return; }
   auth.onAuthStateChanged(async user=>{
     if(user){
       const email=(user.email||'').toLowerCase();
@@ -1316,6 +1333,7 @@ function doLogin(){
   const email=document.getElementById('lg-email').value.trim();
   const pass=document.getElementById('lg-pass').value;
   const err=document.getElementById('lg-err');
+  if(!auth){err.textContent='⚠️ تعذّر الاتصال بـ Firebase — حدّث الصفحة (Ctrl+Shift+R)';return;}
   if(!email||!pass){err.textContent='أدخل البريد وكلمة المرور';return;}
   err.textContent='جارٍ الدخول...';
   auth.signInWithEmailAndPassword(email,pass).then(()=>{err.textContent='';}).catch(e=>{err.textContent=authErr(e.code);});

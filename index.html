@@ -610,7 +610,7 @@ function renderAcc(){
   document.getElementById('ac-in').textContent=fmt(tin);
   document.getElementById('ac-out').textContent=fmt(tout);
   const net=tin-tout, ne=document.getElementById('ac-net');
-  ne.textContent=fmt(net); ne.className='v'; ne.classList.add(net>=0?'money':'','',net>=0?'in':'out');
+  ne.textContent=fmt(net); ne.className='v money '+(net>=0?'in':'out');
   ne.style.color=net>=0?'var(--income)':'var(--expense)';
   // report
   const rb=document.getElementById('ac-report');

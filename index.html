@@ -352,7 +352,33 @@
 
     <!-- AGENDA (Tasks & Meetings + Gmail) -->
     <section class="view" id="view-agenda">
-      <div class="topbar"><div><h2>🗓️ المهام والاجتماعات</h2><p>أضِف بالكتابة أو بالتسجيل الصوتي، ثم أرسِلها لتقويم Google أو بريدك.</p></div></div>
+      <div class="topbar">
+        <div><h2>🗓️ المهام والاجتماعات</h2><p>أضِف بالكتابة أو بالتسجيل الصوتي، ثم أرسِلها لتقويم Google أو بريدك.</p></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="gc-badge" class="pill y">التقويم: غير مربوط</span>
+          <button class="btn ghost sm" type="button" onclick="gcToggleSettings()">⚙️ ربط تقويم Google</button>
+        </div>
+      </div>
+
+      <!-- إعدادات الربط التلقائي بتقويم Google -->
+      <div class="card" id="gc-settings" style="display:none;border-color:var(--brand)">
+        <h3 style="margin:0 0 10px;font-size:15px">🔗 الربط التلقائي بتقويم Google</h3>
+        <p style="margin:0 0 12px;font-size:12.5px;color:var(--muted);line-height:1.8">
+          بعد الربط، زر «إضافة للتقويم» ينشئ الاجتماع مباشرةً في تقويمك مع <b>تذكير بريدي قبل ساعتين</b> — بدون فتح نوافذ.
+          يعمل فقط على رابط <b>https</b> (بعد النشر على GitHub Pages).
+        </p>
+        <div class="form-row">
+          <div style="grid-column:1/-2"><label>Google OAuth Client ID</label>
+            <input id="gc-cid" placeholder="مثال: 1234567890-abcdefg.apps.googleusercontent.com" dir="ltr" style="text-align:left"></div>
+          <div style="display:flex;align-items:end"><button class="btn" type="button" onclick="gcSaveId()">💾 حفظ</button></div>
+        </div>
+        <div class="toolbar" style="margin-top:10px">
+          <button class="btn" type="button" onclick="gcConnect()">🔓 اربط حسابي في Google</button>
+          <button class="btn ghost sm" type="button" onclick="gcDisconnect()">فصل الربط</button>
+        </div>
+        <p id="gc-status" style="margin:12px 0 0;font-size:12.5px;line-height:1.8;color:var(--muted)"></p>
+      </div>
+
       <div class="card">
         <div class="form-row">
           <div><label>النوع</label><select id="ag-type"><option value="task">مهمة</option><option value="meeting">اجتماع</option></select></div>
@@ -524,6 +550,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- Google Identity Services (تقويم Google) -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <script>
 /* ---- Firebase init ---- */
@@ -914,12 +942,109 @@ function agGCalLink(x){
   if(x.notes)u+='&details='+encodeURIComponent(x.notes);
   return u;
 }
+/* ---- Google Calendar: ربط تلقائي (OAuth) ---- */
+const GC_SCOPE='https://www.googleapis.com/auth/calendar.events';
+const GC_TZ='Asia/Riyadh';
+let gcToken=null, gcTokenExp=0, gcClient=null;
+
+function gcId(){ return (localStorage.getItem('athar_gcid')||'').trim(); }
+function gcSecure(){ return location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'; }
+function gcConnected(){ return !!gcToken && Date.now()<gcTokenExp; }
+function gcSay(msg){ const e=document.getElementById('gc-status'); if(e)e.innerHTML=msg; }
+function gcBadge(){
+  const b=document.getElementById('gc-badge'); if(!b)return;
+  if(gcConnected()){ b.className='pill g'; b.textContent='التقويم: مربوط ✅'; }
+  else if(!gcId()){ b.className='pill y'; b.textContent='التقويم: غير مربوط'; }
+  else { b.className='pill y'; b.textContent='التقويم: يحتاج إذن'; }
+}
+function gcToggleSettings(){
+  const c=document.getElementById('gc-settings');
+  c.style.display = c.style.display==='none' ? '' : 'none';
+  if(c.style.display===''){
+    document.getElementById('gc-cid').value=gcId();
+    if(!gcSecure())gcSay('⚠️ الصفحة مفتوحة من ملف محلي — الربط التلقائي يحتاج رابط <b>https</b>. انشر اللوحة على GitHub Pages أولًا، وحتى ذلك الحين استخدم زر «تقويم Google» اليدوي.');
+    else if(!gcId())gcSay('ℹ️ الصق الـ Client ID من Google Cloud Console ثم اضغط حفظ.');
+    else gcSay('✅ الـ Client ID محفوظ. اضغط «اربط حسابي في Google».');
+  }
+}
+function gcSaveId(){
+  const v=document.getElementById('gc-cid').value.trim();
+  localStorage.setItem('athar_gcid',v);
+  gcToken=null; gcTokenExp=0; gcClient=null; gcBadge();
+  gcSay(v?'✅ تم الحفظ. اضغط «اربط حسابي في Google».':'🗑️ تم مسح الـ Client ID.');
+}
+function gcDisconnect(){
+  if(gcToken&&window.google&&google.accounts&&google.accounts.oauth2){ try{ google.accounts.oauth2.revoke(gcToken); }catch(_){} }
+  gcToken=null; gcTokenExp=0; gcBadge(); gcSay('🔒 تم فصل الربط.'); renderAgenda();
+}
+function gcConnect(cb){
+  if(!gcSecure())return gcSay('⚠️ الربط التلقائي يحتاج رابط <b>https</b> (بعد النشر). استخدم الزر اليدوي حاليًا.');
+  const cid=gcId();
+  if(!cid)return gcSay('⚠️ الصق الـ Client ID أولًا ثم اضغط حفظ.');
+  if(!(window.google&&google.accounts&&google.accounts.oauth2))
+    return gcSay('⚠️ لم تُحمّل مكتبة Google (تحقّق من الإنترنت وحدّث الصفحة).');
+  gcSay('⏳ جارٍ فتح نافذة إذن Google...');
+  try{
+    gcClient=google.accounts.oauth2.initTokenClient({
+      client_id:cid, scope:GC_SCOPE,
+      callback:(r)=>{
+        if(r&&r.access_token){
+          gcToken=r.access_token;
+          gcTokenExp=Date.now()+((r.expires_in||3600)-60)*1000;
+          gcBadge(); gcSay('✅ تم الربط بنجاح — صار بإمكانك إضافة الاجتماعات تلقائيًا.'); renderAgenda();
+          if(typeof cb==='function')cb();
+        } else gcSay('⚠️ لم يتم منح الإذن.');
+      },
+      error_callback:(e)=>gcSay('⚠️ تعذّر الربط: '+((e&&e.type)||'خطأ غير معروف')+' — تأكّد أن رابط الموقع مضاف في «Authorized JavaScript origins».')
+    });
+    gcClient.requestAccessToken({prompt:gcToken?'':'consent'});
+  }catch(e){ gcSay('⚠️ تعذّر بدء الربط: '+(e&&e.message||e)); }
+}
+function agTimes(x){
+  const t=x.time||'09:00';
+  const d=x.date||new Date().toISOString().slice(0,10);
+  const s=new Date(d+'T'+t);
+  const e=new Date(s.getTime()+60*60*1000);
+  const iso=v=>v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0')
+    +'T'+String(v.getHours()).padStart(2,'0')+':'+String(v.getMinutes()).padStart(2,'0')+':00';
+  return {start:iso(s), end:iso(e)};
+}
+async function gcAdd(id){
+  const arr=DB.get('ag'), x=arr.find(a=>a.id===id); if(!x)return;
+  if(!gcConnected()){ document.getElementById('gc-settings').style.display=''; return gcConnect(()=>gcAdd(id)); }
+  const tm=agTimes(x);
+  const body={
+    summary:(x.type==='meeting'?'اجتماع: ':'مهمة: ')+x.title,
+    description:(x.notes||'')+'\n\n— أُضيف من لوحة تحكم مشروع أثر',
+    start:{dateTime:tm.start,timeZone:GC_TZ},
+    end:{dateTime:tm.end,timeZone:GC_TZ},
+    reminders:{useDefault:false,overrides:[{method:'email',minutes:120},{method:'popup',minutes:30}]}
+  };
+  gcSay('⏳ جارٍ إضافة «'+x.title+'» إلى التقويم...');
+  try{
+    const res=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=none',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+gcToken,'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+    const data=await res.json();
+    if(!res.ok)throw new Error((data&&data.error&&data.error.message)||('HTTP '+res.status));
+    x.gcalId=data.id; x.gcalLink=data.htmlLink;
+    DB.set('ag',arr); renderAgenda();
+    gcSay('✅ تمت الإضافة للتقويم مع تذكير بريدي قبل ساعتين.');
+  }catch(e){
+    if(String(e.message).match(/401|invalid|credential/i)){ gcToken=null; gcTokenExp=0; gcBadge(); gcSay('⚠️ انتهت صلاحية الإذن — اضغط «اربط حسابي» مرة أخرى.'); }
+    else gcSay('⚠️ تعذّرت الإضافة: '+e.message);
+  }
+}
+
 function agMailLink(x){
   const sub=encodeURIComponent((x.type==='meeting'?'اجتماع: ':'مهمة: ')+x.title);
   const body=encodeURIComponent([x.title,x.date?('التاريخ: '+x.date+(x.time?(' الساعة '+x.time):'')):'',x.notes?('التفاصيل: '+x.notes):''].filter(Boolean).join('\n'));
   return 'https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(MY_EMAIL)+'&su='+sub+'&body='+body;
 }
 function renderAgenda(){
+  gcBadge();
   const arr=DB.get('ag').sort((a,b)=>((a.date||'9999')+(a.time||'')).localeCompare((b.date||'9999')+(b.time||'')));
   const el=document.getElementById('ag-list');
   el.innerHTML=arr.length?'':'<div class="empty">لا توجد مهام أو اجتماعات بعد.</div>';
@@ -933,8 +1058,10 @@ function renderAgenda(){
       </div>
       <div style="font-size:12.5px;color:var(--muted);margin:8px 0">🕒 ${esc(when)}</div>
       ${x.notes?`<p style="margin:0 0 10px;font-size:13px;color:#c7d3e0;line-height:1.7;white-space:pre-wrap">${esc(x.notes)}</p>`:''}
+      ${x.gcalLink?`<div style="font-size:12px;color:var(--brand);margin:0 0 8px">✅ في تقويم Google — <a href="${x.gcalLink}" target="_blank">فتح الحدث</a></div>`:''}
       <div class="file-actions">
-        <a class="btn ghost sm" href="${agGCalLink(x)}" target="_blank">🗓️ تقويم Google</a>
+        ${x.gcalLink?'':`<button class="btn ghost sm" onclick="gcAdd('${x.id}')">🗓️ إضافة للتقويم${gcConnected()?' (تلقائي)':''}</button>`}
+        <a class="btn ghost sm" href="${agGCalLink(x)}" target="_blank">↗️ يدويًا</a>
         <a class="btn ghost sm" href="${agMailLink(x)}" target="_blank">✉️ إرسال لبريدي</a>
         <button class="btn ghost sm" onclick="toggleAg('${x.id}')">${x.done?'↩️ تراجع':'✔️ إنجاز'}</button>
         <button class="btn danger sm" onclick="del('ag','${x.id}',renderAgenda)">حذف</button>

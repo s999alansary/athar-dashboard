@@ -1023,7 +1023,12 @@ function gcConnected(){ return !!gcToken && Date.now()<gcTokenExp; }
 function gcSay(msg,t){ const e=document.getElementById('gc-status'); if(e)e.innerHTML=msg; if(t)toast(msg,t); }
 function gcBadge(){
   const b=document.getElementById('gc-badge'); if(!b)return;
-  if(gcConnected()){ b.className='pill g'; b.textContent='التقويم: مربوط ✅'; }
+  let mail=''; try{ mail=localStorage.getItem('athar_gcmail')||''; }catch(_){}
+  if(gcConnected()){
+    b.className='pill g';
+    b.textContent='التقويم: مربوط ✅'+(mail?(' — '+mail):'');
+    b.title=mail?('الأحداث تُضاف إلى تقويم '+mail):'';
+  }
   else if(!gcId()){ b.className='pill y'; b.textContent='التقويم: غير مربوط'; }
   else { b.className='pill y'; b.textContent='التقويم: يحتاج إذن'; }
 }
@@ -1126,8 +1131,11 @@ async function gcAdd(id){
     const data=await res.json();
     if(!res.ok)throw new Error((data&&data.error&&data.error.message)||('HTTP '+res.status));
     x.gcalId=data.id; x.gcalLink=data.htmlLink;
-    DB.set('ag',arr); renderAgenda();
-    gcSay('✅ تمت إضافة «'+esc(x.title)+'» إلى تقويم Google يوم '+tm.start.slice(0,10)+' مع تذكير بريدي قبل ساعتين.','ok');
+    x.gcalAccount=(data.organizer&&data.organizer.email)||(data.creator&&data.creator.email)||'';
+    if(x.gcalAccount){ try{ localStorage.setItem('athar_gcmail',x.gcalAccount); }catch(_){} }
+    DB.set('ag',arr); renderAgenda(); gcBadge();
+    gcSay('✅ أُضيف «'+esc(x.title)+'» يوم '+tm.start.slice(0,10)+' الساعة '+tm.start.slice(11,16)
+      +' في تقويم <b>'+esc(x.gcalAccount||'حسابك')+'</b> مع تذكير بريدي قبل ساعتين.','ok');
   }catch(e){
     if(String(e.message).match(/401|invalid|credential|unauthor/i)){
       gcStore(null,0); gcBadge();
@@ -1158,7 +1166,8 @@ function renderAgenda(){
       </div>
       <div style="font-size:12.5px;color:var(--muted);margin:8px 0">🕒 ${esc(when)}</div>
       ${x.notes?`<p style="margin:0 0 10px;font-size:13px;color:#c7d3e0;line-height:1.7;white-space:pre-wrap">${esc(x.notes)}</p>`:''}
-      ${x.gcalLink?`<div style="font-size:12px;color:var(--brand);margin:0 0 8px">✅ في تقويم Google — <a href="${x.gcalLink}" target="_blank">فتح الحدث</a></div>`:''}
+      ${x.gcalLink?`<div style="font-size:12px;color:var(--brand);margin:0 0 8px;line-height:1.7">✅ في تقويم Google — <a href="${x.gcalLink}" target="_blank">فتح الحدث</a>
+        ${x.gcalAccount?`<br><span style="color:var(--muted)">الحساب: ${esc(x.gcalAccount)}</span>`:''}</div>`:''}
       <div class="file-actions">
         ${x.gcalLink?'':`<button class="btn ghost sm" onclick="gcAdd('${x.id}')">🗓️ إضافة للتقويم${gcConnected()?' (تلقائي)':''}</button>`}
         <a class="btn ghost sm" href="${agGCalLink(x)}" target="_blank">↗️ يدويًا</a>

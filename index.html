@@ -364,8 +364,8 @@
       <div class="card" id="gc-settings" style="display:none;border-color:var(--brand)">
         <h3 style="margin:0 0 10px;font-size:15px">🔗 الربط التلقائي بتقويم Google</h3>
         <p style="margin:0 0 12px;font-size:12.5px;color:var(--muted);line-height:1.8">
-          بعد الربط، زر «إضافة للتقويم» ينشئ الاجتماع مباشرةً في تقويمك مع <b>تذكير بريدي قبل ساعتين</b> — بدون فتح نوافذ.
-          يعمل فقط على رابط <b>https</b> (بعد النشر على GitHub Pages).
+          زر «إضافة للتقويم» ينشئ الاجتماع مباشرةً في تقويمك مع <b>تذكير بريدي قبل ساعتين</b> — بدون فتح نوافذ.
+          الإذن صالح لساعة، فإذا أُغلقت اللوحة اضغط «اربط حسابي» ضغطة واحدة (بدون إعادة الموافقة).
         </p>
         <div class="form-row">
           <div style="grid-column:1/-2"><label>Google OAuth Client ID</label>
@@ -388,8 +388,15 @@
               <button class="btn ghost" id="ag-mic" type="button" onclick="micToField('ag-title')" title="تسجيل صوتي">🎙️</button>
             </div>
           </div>
-          <div><label>التاريخ</label><input id="ag-date" type="date"></div>
-          <div><label>الوقت</label><input id="ag-time" type="time"></div>
+          <div><label>التاريخ</label>
+            <input id="ag-date" type="date" onclick="openPicker(this)" onfocus="openPicker(this)" style="cursor:pointer">
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <button class="btn ghost sm" type="button" onclick="agSetDate(0)">اليوم</button>
+              <button class="btn ghost sm" type="button" onclick="agSetDate(1)">غدًا</button>
+              <button class="btn ghost sm" type="button" onclick="agSetDate(7)">بعد أسبوع</button>
+            </div>
+          </div>
+          <div><label>الوقت</label><select id="ag-time"></select></div>
           <div style="grid-column:1/-2"><label>ملاحظات / تفاصيل</label>
             <div style="display:flex;gap:8px">
               <input id="ag-notes" placeholder="تفاصيل، مكان، رابط...">
@@ -942,6 +949,48 @@ function agGCalLink(x){
   if(x.notes)u+='&details='+encodeURIComponent(x.notes);
   return u;
 }
+/* ---- إشعار عائم يظهر في كل الأحوال ---- */
+function toast(msg,type){
+  let t=document.getElementById('athar-toast');
+  if(!t){
+    t=document.createElement('div'); t.id='athar-toast';
+    t.style.cssText='position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:99999;'
+      +'padding:13px 20px;border-radius:12px;font-size:14px;font-family:inherit;line-height:1.8;'
+      +'box-shadow:0 10px 34px rgba(0,0,0,.5);max-width:92vw;text-align:center;color:#fff;display:none';
+    document.body.appendChild(t);
+  }
+  const ok=type==='ok', err=type==='err';
+  t.style.background = err?'#4d1b1b' : ok?'#0f4c39' : '#1d2c3d';
+  t.style.border='1px solid '+(err?'#e74c3c':ok?'#2ecc9b':'#26384c');
+  t.innerHTML=msg; t.style.display='block';
+  clearTimeout(t._tm); t._tm=setTimeout(()=>{t.style.display='none';}, err?10000:5000);
+}
+
+/* ---- اختيار التاريخ والوقت من قوائم بدل الكتابة ---- */
+function openPicker(el){ try{ if(el.showPicker)el.showPicker(); }catch(_){} }
+function agSetDate(plusDays){
+  const d=new Date(); d.setDate(d.getDate()+plusDays);
+  const v=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  document.getElementById('ag-date').value=v;
+}
+function timeLabel(h,m){
+  const suffix=h<12?'ص':'م';
+  let h12=h%12; if(h12===0)h12=12;
+  return String(h12).padStart(2,'0')+':'+String(m).padStart(2,'0')+' '+suffix;
+}
+function initTimeSelect(){
+  const sel=document.getElementById('ag-time'); if(!sel)return;
+  let html='<option value="">— بدون وقت —</option>';
+  for(let h=6;h<=23;h++){
+    for(const m of [0,30]){
+      const v=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+      html+='<option value="'+v+'">'+timeLabel(h,m)+'</option>';
+    }
+  }
+  sel.innerHTML=html;
+  sel.value='09:00';
+}
+
 /* ---- Google Calendar: ربط تلقائي (OAuth) ---- */
 const GC_SCOPE='https://www.googleapis.com/auth/calendar.events';
 const GC_TZ='Asia/Riyadh';
@@ -952,7 +1001,7 @@ const GC_DEFAULT_ID='509007437620-bcriebe5rukdlhnnn5d1sbg2fndcrlfp.apps.googleus
 function gcId(){ return ((localStorage.getItem('athar_gcid')||'').trim())||GC_DEFAULT_ID; }
 function gcSecure(){ return location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'; }
 function gcConnected(){ return !!gcToken && Date.now()<gcTokenExp; }
-function gcSay(msg){ const e=document.getElementById('gc-status'); if(e)e.innerHTML=msg; }
+function gcSay(msg,t){ const e=document.getElementById('gc-status'); if(e)e.innerHTML=msg; if(t)toast(msg,t); }
 function gcBadge(){
   const b=document.getElementById('gc-badge'); if(!b)return;
   if(gcConnected()){ b.className='pill g'; b.textContent='التقويم: مربوط ✅'; }
@@ -992,11 +1041,11 @@ function gcConnect(cb){
         if(r&&r.access_token){
           gcToken=r.access_token;
           gcTokenExp=Date.now()+((r.expires_in||3600)-60)*1000;
-          gcBadge(); gcSay('✅ تم الربط بنجاح — صار بإمكانك إضافة الاجتماعات تلقائيًا.'); renderAgenda();
+          gcBadge(); gcSay('✅ تم الربط بنجاح — صار بإمكانك إضافة الاجتماعات تلقائيًا.','ok'); renderAgenda();
           if(typeof cb==='function')cb();
         } else gcSay('⚠️ لم يتم منح الإذن.');
       },
-      error_callback:(e)=>gcSay('⚠️ تعذّر الربط: '+((e&&e.type)||'خطأ غير معروف')+' — تأكّد أن رابط الموقع مضاف في «Authorized JavaScript origins».')
+      error_callback:(e)=>gcSay('⚠️ تعذّر الربط: '+((e&&e.type)||'خطأ غير معروف')+' — تأكّد أن رابط الموقع مضاف في «Authorized JavaScript origins».','err')
     });
     gcClient.requestAccessToken({prompt:gcToken?'':'consent'});
   }catch(e){ gcSay('⚠️ تعذّر بدء الربط: '+(e&&e.message||e)); }
@@ -1032,10 +1081,10 @@ async function gcAdd(id){
     if(!res.ok)throw new Error((data&&data.error&&data.error.message)||('HTTP '+res.status));
     x.gcalId=data.id; x.gcalLink=data.htmlLink;
     DB.set('ag',arr); renderAgenda();
-    gcSay('✅ تمت الإضافة للتقويم مع تذكير بريدي قبل ساعتين.');
+    gcSay('✅ تمت إضافة «'+esc(x.title)+'» إلى تقويم Google يوم '+tm.start.slice(0,10)+' مع تذكير بريدي قبل ساعتين.','ok');
   }catch(e){
-    if(String(e.message).match(/401|invalid|credential/i)){ gcToken=null; gcTokenExp=0; gcBadge(); gcSay('⚠️ انتهت صلاحية الإذن — اضغط «اربط حسابي» مرة أخرى.'); }
-    else gcSay('⚠️ تعذّرت الإضافة: '+e.message);
+    if(String(e.message).match(/401|invalid|credential/i)){ gcToken=null; gcTokenExp=0; gcBadge(); gcSay('⚠️ انتهت صلاحية الإذن — اضغط «اربط حسابي» مرة أخرى.','err'); }
+    else gcSay('⚠️ تعذّرت الإضافة: '+e.message,'err');
   }
 }
 
@@ -1505,6 +1554,7 @@ function delUserRole(email){
 
 /* init */
 document.getElementById('ac-date').value=new Date().toISOString().slice(0,10);
+initTimeSelect(); agSetDate(0);
 FEAS=feasLoad();renderFeas();renderReqList();
 renderMk();renderBz();renderAcc();renderRs();renderReq();renderPeaks();initDesign();renderAgenda();newLetter();renderSecretary();renderHome();initAuth();
 </script>

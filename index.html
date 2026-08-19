@@ -947,7 +947,9 @@ const GC_SCOPE='https://www.googleapis.com/auth/calendar.events';
 const GC_TZ='Asia/Riyadh';
 let gcToken=null, gcTokenExp=0, gcClient=null;
 
-function gcId(){ return (localStorage.getItem('athar_gcid')||'').trim(); }
+/* Client ID الافتراضي لمشروع أثر — يمكن تجاوزه من بطاقة الإعدادات */
+const GC_DEFAULT_ID='509007437620-bcriebe5rukdlhnnn5d1sbg2fndcrlfp.apps.googleusercontent.com';
+function gcId(){ return ((localStorage.getItem('athar_gcid')||'').trim())||GC_DEFAULT_ID; }
 function gcSecure(){ return location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'; }
 function gcConnected(){ return !!gcToken && Date.now()<gcTokenExp; }
 function gcSay(msg){ const e=document.getElementById('gc-status'); if(e)e.innerHTML=msg; }
@@ -963,8 +965,7 @@ function gcToggleSettings(){
   if(c.style.display===''){
     document.getElementById('gc-cid').value=gcId();
     if(!gcSecure())gcSay('⚠️ الصفحة مفتوحة من ملف محلي — الربط التلقائي يحتاج رابط <b>https</b>. انشر اللوحة على GitHub Pages أولًا، وحتى ذلك الحين استخدم زر «تقويم Google» اليدوي.');
-    else if(!gcId())gcSay('ℹ️ الصق الـ Client ID من Google Cloud Console ثم اضغط حفظ.');
-    else gcSay('✅ الـ Client ID محفوظ. اضغط «اربط حسابي في Google».');
+    else gcSay('✅ المفتاح جاهز — اضغط «اربط حسابي في Google» مباشرة. (لا تحتاج تغيير الحقل أدناه إلا لمشروع Google آخر.)');
   }
 }
 function gcSaveId(){

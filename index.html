@@ -508,11 +508,39 @@
           <div class="toolbar"><button class="btn" onclick="genBuild()">🎨 صمّم</button></div>
         </div>
         <div id="gn-result"></div>
-        <div class="card" style="margin-top:16px">
-          <label>مربع طلبك الخاص — اكتب بالضبط ما تحتاجه (يصلني لتنفيذه، وسيتحوّل لذكاء اصطناعي يفهمه تلقائيًا عند الاستضافة)</label>
-          <textarea id="gn-req" style="min-height:90px" placeholder="مثال: أريد تقريرًا يقارن التبرعات بين الأحياء مع نسبة النمو الشهري ولون مميّز لكل حي..."></textarea>
-          <div class="toolbar"><button class="btn ghost sm" onclick="saveReq()">💾 حفظ الطلب</button></div>
-          <div id="gn-req-list" style="margin-top:6px"></div>
+        <div class="card" style="margin-top:16px;border-color:var(--accent)">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <h3 style="margin:0;font-size:15px">🤖 اطلب من الذكاء الاصطناعي</h3>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span id="ai-badge" class="pill y">غير مفعّل</span>
+              <button class="btn ghost sm" type="button" onclick="aiToggleSettings()">⚙️ إعداد</button>
+            </div>
+          </div>
+          <p style="margin:8px 0 12px;font-size:12.5px;color:var(--muted);line-height:1.8">
+            اكتب طلبك بالعربية كما تشرحه لموظف، وسيفهمه ويُنفّذه. إن لصقت بيانات في الحقل الأول أعلاه فسيُحلّلها معك.
+          </p>
+
+          <div id="ai-settings" style="display:none;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px">
+            <label>رابط الوسيط (Cloudflare Worker)</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <input id="ai-url" placeholder="https://athar-ai.<اسمك>.workers.dev" dir="ltr" style="text-align:left;flex:1;min-width:240px">
+              <button class="btn" type="button" onclick="aiSaveUrl()">💾 حفظ</button>
+              <button class="btn ghost" type="button" onclick="aiTest()">🔌 اختبار</button>
+            </div>
+            <p style="margin:10px 0 0;font-size:12px;color:var(--muted);line-height:1.8">
+              الرابط مضبوط مسبقًا ولا يحتاج تغييرًا. مفتاح Claude محفوظ مشفَّرًا داخل الوسيط ولا يظهر هنا إطلاقًا،
+              والوسيط يرفض أي طلب لا يأتي من مستخدم مسجَّل دخوله في اللوحة.
+            </p>
+          </div>
+
+          <textarea id="gn-req" style="min-height:90px" placeholder="مثال: حلّل تبرعات الأشهر الستة أعلاه، وحدّد أفضل شهر لتكثيف الحملات مع السبب"></textarea>
+          <div class="toolbar">
+            <button class="btn" type="button" onclick="aiAsk()">✨ نفّذ الطلب</button>
+            <button class="btn ghost sm" type="button" onclick="saveReq()">💾 حفظ الطلب للأرشيف</button>
+          </div>
+          <div id="ai-out" style="margin-top:14px"></div>
+          <h4 style="margin:18px 0 6px;font-size:13.5px;color:var(--muted)">الطلبات المحفوظة</h4>
+          <div id="gn-req-list"></div>
         </div>
       </div>
     </section>
@@ -1441,6 +1469,108 @@ function stExport(){
   }
 }
 
+/* ---- مولّد الذكاء الاصطناعي (عبر وسيط Cloudflare) ---- */
+/* رابط وسيط Cloudflare الافتراضي — يمكن تجاوزه من بطاقة الإعداد */
+const AI_DEFAULT_URL='https://withered-waterfall-5f07.s-999-alansary.workers.dev';
+function aiUrl(){ return ((localStorage.getItem('athar_ai_url')||'').trim())||AI_DEFAULT_URL; }
+function aiBadge(){
+  const b=document.getElementById('ai-badge'); if(!b)return;
+  if(aiUrl()){ b.className='pill g'; b.textContent='جاهز ✅'; }
+  else { b.className='pill y'; b.textContent='غير مفعّل'; }
+}
+function aiToggleSettings(){
+  const c=document.getElementById('ai-settings');
+  c.style.display = c.style.display==='none' ? '' : 'none';
+  if(c.style.display==='')document.getElementById('ai-url').value=aiUrl();
+}
+function aiSaveUrl(){
+  let v=document.getElementById('ai-url').value.trim().replace(/\/+$/,'');
+  if(v&&!/^https:\/\//i.test(v))return toast('⚠️ يجب أن يبدأ الرابط بـ https://','err');
+  localStorage.setItem('athar_ai_url',v); aiBadge();
+  toast(v?'✅ تم حفظ رابط الوسيط.':'🗑️ تم مسح الرابط.','ok');
+}
+async function aiTest(){
+  try{
+    const r=await aiCall('اكتب كلمة: جاهز','');
+    toast('✅ الوسيط يعمل — رد النموذج: '+esc(r.slice(0,60)),'ok');
+  }catch(e){ toast('⚠️ '+esc(e.message),'err'); }
+}
+/* يرسل الطلب للوسيط مرفقًا برمز دخول Firebase */
+async function aiCall(prompt,data){
+  const url=aiUrl();
+  if(!url)throw new Error('لم يُضبط رابط الوسيط. اضغط ⚙️ إعداد.');
+  if(!auth||!auth.currentUser)throw new Error('سجّل دخولك في اللوحة أولًا.');
+  const token=await auth.currentUser.getIdToken();
+  const res=await fetch(url,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+    body:JSON.stringify({prompt,data})
+  });
+  const out=await res.json().catch(()=>({error:'رد غير مفهوم من الوسيط (HTTP '+res.status+')'}));
+  if(!res.ok||out.error)throw new Error(out.error||('HTTP '+res.status));
+  return out.text+(out.truncated?'\n\n⚠️ (اقتُطع الرد لطوله — اطلب تفصيلًا أقل أو قسّم الطلب)':'');
+}
+/* عرض مبسّط لتنسيق Markdown */
+function mdToHtml(s){
+  const rows=[]; let html='';
+  esc(s).split('\n').forEach(line=>{
+    if(/^\s*\|.*\|\s*$/.test(line)){ rows.push(line); return; }
+    if(rows.length){ html+=mdTable(rows.splice(0)); }
+    if(/^###\s+/.test(line))          html+='<h4 style="margin:14px 0 6px;font-size:14px">'+line.replace(/^###\s+/,'')+'</h4>';
+    else if(/^##\s+/.test(line))      html+='<h3 style="margin:16px 0 8px;font-size:15.5px;color:var(--brand)">'+line.replace(/^##\s+/,'')+'</h3>';
+    else if(/^#\s+/.test(line))       html+='<h3 style="margin:16px 0 8px;font-size:16px;color:var(--brand)">'+line.replace(/^#\s+/,'')+'</h3>';
+    else if(/^\s*[-*]\s+/.test(line)) html+='<div style="margin:3px 0 3px 0;padding-inline-start:16px">• '+line.replace(/^\s*[-*]\s+/,'')+'</div>';
+    else if(/^\s*\d+[.)]\s+/.test(line))html+='<div style="margin:3px 0;padding-inline-start:16px">'+line.trim()+'</div>';
+    else if(!line.trim())             html+='<div style="height:8px"></div>';
+    else                              html+='<p style="margin:6px 0;line-height:1.9">'+line+'</p>';
+  });
+  if(rows.length)html+=mdTable(rows);
+  return html.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+}
+function mdTable(rows){
+  const cells=r=>r.replace(/^\s*\|/,'').replace(/\|\s*$/,'').split('|').map(c=>c.trim());
+  const body=rows.filter(r=>!/^\s*\|[\s|:-]+\|\s*$/.test(r));
+  if(!body.length)return '';
+  let h='<div class="tbl-wrap" style="margin:10px 0"><table><thead><tr>';
+  cells(body[0]).forEach(c=>h+='<th>'+c+'</th>');
+  h+='</tr></thead><tbody>';
+  body.slice(1).forEach(r=>{ h+='<tr>'; cells(r).forEach(c=>h+='<td>'+c+'</td>'); h+='</tr>'; });
+  return h+'</tbody></table></div>';
+}
+async function aiAsk(){
+  const prompt=document.getElementById('gn-req').value.trim();
+  if(!prompt)return toast('⚠️ اكتب طلبك أولًا.','err');
+  const data=document.getElementById('gn-data').value.trim();
+  const out=document.getElementById('ai-out');
+  out.innerHTML='<div class="card" style="text-align:center;color:var(--muted)">⏳ جارٍ التفكير والتنفيذ... قد يستغرق نصف دقيقة.</div>';
+  try{
+    const text=await aiCall(prompt,data);
+    out.innerHTML='<div class="card" style="border-color:var(--brand)">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px">'
+      +'<b style="font-size:14px">✨ النتيجة</b>'
+      +'<div style="display:flex;gap:6px">'
+      +'<button class="btn ghost sm" type="button" onclick="aiCopy()">📋 نسخ</button>'
+      +'<button class="btn ghost sm" type="button" onclick="aiPrint()">🖨️ طباعة</button></div></div>'
+      +'<div id="ai-text">'+mdToHtml(text)+'</div></div>';
+    out.dataset.raw=text;
+  }catch(e){
+    out.innerHTML='<div class="card" style="border-color:var(--expense)">⚠️ '+esc(e.message)+'</div>';
+  }
+}
+function aiCopy(){
+  const t=document.getElementById('ai-out').dataset.raw||'';
+  navigator.clipboard.writeText(t).then(()=>toast('✅ نُسخت النتيجة.','ok'),()=>toast('⚠️ تعذّر النسخ.','err'));
+}
+function aiPrint(){
+  const t=document.getElementById('ai-text'); if(!t)return;
+  const w=window.open('','_blank');
+  w.document.write('<html dir="rtl"><head><meta charset="utf-8"><title>تقرير — مشروع أثر</title>'
+    +'<style>body{font-family:Tahoma,sans-serif;padding:36px;line-height:1.9;color:#111}'
+    +'table{border-collapse:collapse;width:100%;margin:12px 0}th,td{border:1px solid #999;padding:7px;text-align:right}'
+    +'th{background:#eee}h3,h4{color:#1f8f6f}</style></head><body>'+t.innerHTML+'</body></html>');
+  w.document.close(); w.print();
+}
+
 /* ---- Generator by request (مولّد حسب الطلب) ---- */
 let GEN_TABLE=null;
 function genParse(){
@@ -1622,7 +1752,7 @@ document.querySelectorAll('[id]').forEach(el=>{
 });
 
 document.getElementById('ac-date').value=new Date().toISOString().slice(0,10);
-initTimeSelect(); agSetDate(0); gcAutoConnect();
+initTimeSelect(); agSetDate(0); gcAutoConnect(); aiBadge();
 FEAS=feasLoad();renderFeas();renderReqList();
 renderMk();renderBz();renderAcc();renderRs();renderReq();renderPeaks();initDesign();renderAgenda();newLetter();renderSecretary();renderHome();initAuth();
 </script>

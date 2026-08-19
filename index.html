@@ -449,9 +449,36 @@
         <button class="btn ghost sm" onclick="stExport()">⬇️ تصدير CSV</button>
       </div>
       <div class="tabs" id="st-tabs">
-        <button class="active" onclick="stTab('feas',this)">🏗️ دراسة جدوى</button>
+        <button class="active" onclick="stTab('smart',this)">✨ دراسة جدوى ذكية</button>
+        <button onclick="stTab('feas',this)">🏗️ حاسبة يدوية</button>
         <button onclick="stTab('anal',this)">🧮 محلّل بيانات عام</button>
         <button onclick="stTab('gen',this)">🎯 مولّد حسب الطلب</button>
+      </div>
+
+      <!-- Smart AI feasibility study -->
+      <div id="st-smart">
+        <div class="card" style="border-color:var(--brand)">
+          <label style="font-size:14px">١) اكتب كل ما لديك عن المشروع — فكرته، أرقامه، أسئلتك</label>
+          <textarea id="sf-input" style="min-height:150px;font-size:14px"
+            placeholder="مثال: نريد إنشاء ورشة لإعادة تدوير الأثاث المتبرَّع به في الرياض. المتوقع استئجار مستودع بـ 4000 ريال شهريًا، وتوظيف 3 عمال براتب 3500 لكل واحد، وشراء معدات بـ 60 ألف ريال. نستقبل تقريبًا 200 قطعة شهريًا ونبيع المُصلَح منها بمتوسط 250 ريال. هل المشروع مجدٍ؟ وما نقطة التعادل؟"></textarea>
+
+          <label style="margin-top:14px">٢) أرفق ملفاتك (اختياري) — يقرؤها ويستخرج منها الأرقام</label>
+          <div id="sf-drop" onclick="document.getElementById('sf-files').click()"
+            style="border:2px dashed var(--line);border-radius:12px;padding:20px;text-align:center;cursor:pointer;transition:.15s;background:var(--panel2)">
+            <div style="font-size:26px">📎</div>
+            <div style="font-size:13.5px;margin-top:6px">اسحب الملفات هنا أو اضغط للاختيار</div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:6px">Excel · Word · PDF · CSV · نصوص · صور — حتى ١٢ ملفًا</div>
+          </div>
+          <input type="file" id="sf-files" multiple style="display:none" onchange="sfAddFiles(this.files)">
+          <div id="sf-list" style="margin-top:10px"></div>
+
+          <div class="toolbar" style="margin-top:14px">
+            <button class="btn" type="button" onclick="sfRun()">🚀 أنشئ دراسة الجدوى</button>
+            <button class="btn ghost sm" type="button" onclick="sfClear()">🗑️ مسح الكل</button>
+          </div>
+          <p id="sf-note" style="margin:10px 0 0;font-size:12px;color:var(--muted);line-height:1.8"></p>
+        </div>
+        <div id="sf-out" style="margin-top:16px"></div>
       </div>
 
       <!-- Feasibility -->
@@ -587,6 +614,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <!-- Google Identity Services (تقويم Google) -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- قراءة الملفات المرفقة: Excel · PDF · Word -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js" defer></script>
 
 <script>
 /* ---- Firebase init ---- */
@@ -1322,6 +1353,7 @@ let FEAS=null, ST_TABLE=null;
 function stTab(which,btn){
   document.querySelectorAll('#st-tabs button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  document.getElementById('st-smart').style.display=which==='smart'?'':'none';
   document.getElementById('st-feas').style.display=which==='feas'?'':'none';
   document.getElementById('st-anal').style.display=which==='anal'?'':'none';
   document.getElementById('st-gen').style.display=which==='gen'?'':'none';
@@ -1467,6 +1499,322 @@ function stExport(){
       ST_TABLE.rows.map(r=>ST_TABLE.headers.map((h,i)=>`"${(r[i]||'').replace(/"/g,'""')}"`).join(',')).join('\n');
     stDl(csv,'بيانات-محلّلة.csv');
   }
+}
+
+/* ================= دراسة الجدوى الذكية ================= */
+let SF_FILES=[];
+const SF_MAXMB=8;
+
+function sfNote(m,color){ const e=document.getElementById('sf-note'); if(e){e.innerHTML=m||''; e.style.color=color||'var(--muted)';} }
+function sfClear(){
+  SF_FILES=[]; document.getElementById('sf-input').value='';
+  document.getElementById('sf-out').innerHTML=''; sfRender(); sfNote('');
+}
+function sfRender(){
+  const el=document.getElementById('sf-list');
+  if(!SF_FILES.length){ el.innerHTML=''; return; }
+  el.innerHTML=SF_FILES.map((f,i)=>{
+    const st=f.error?('<span style="color:var(--expense)">⚠️ '+esc(f.error)+'</span>')
+      :f.kind==='image'?'<span style="color:var(--accent)">🖼️ صورة</span>'
+      :('<span style="color:var(--brand)">✅ '+nfmt((f.text||'').length)+' حرفًا</span>');
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--panel2);'
+      +'border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:12.5px">'
+      +'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📄 '+esc(f.name)+'</span>'
+      +'<span style="display:flex;align-items:center;gap:10px;flex-shrink:0">'+st
+      +'<button class="btn danger sm" type="button" onclick="sfDel('+i+')">حذف</button></span></div>';
+  }).join('');
+}
+function sfDel(i){ SF_FILES.splice(i,1); sfRender(); }
+
+async function sfAddFiles(fileList){
+  const files=Array.from(fileList||[]);
+  if(!files.length)return;
+  sfNote('⏳ جارٍ قراءة الملفات...');
+  for(const f of files){
+    if(SF_FILES.length>=12){ toast('⚠️ الحد الأقصى ١٢ ملفًا.','err'); break; }
+    if(f.size>SF_MAXMB*1024*1024){ SF_FILES.push({name:f.name,error:'أكبر من '+SF_MAXMB+' ميجابايت'}); continue; }
+    try{ SF_FILES.push(await sfReadFile(f)); }
+    catch(e){ SF_FILES.push({name:f.name,error:e.message||'تعذّرت القراءة'}); }
+    sfRender();
+  }
+  sfNote('');
+  document.getElementById('sf-files').value='';
+}
+
+/* يستخرج النص من كل نوع ملف */
+async function sfReadFile(f){
+  const name=f.name, ext=(name.split('.').pop()||'').toLowerCase();
+  const type=f.type||'';
+
+  if(/^image\//.test(type)&&/(png|jpe?g|webp|gif)$/i.test(ext)){
+    const b64=await sfBase64(f);
+    return {name,kind:'image',media_type:type==='image/jpg'?'image/jpeg':type,data:b64};
+  }
+  if(/^(xlsx|xls|xlsm)$/.test(ext)){
+    if(typeof XLSX==='undefined')throw new Error('مكتبة Excel لم تُحمّل — تحقّق من الإنترنت');
+    const buf=await f.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    let out='';
+    wb.SheetNames.forEach(sn=>{ out+='\n## ورقة: '+sn+'\n'+XLSX.utils.sheet_to_csv(wb.Sheets[sn]); });
+    return {name,kind:'text',text:out.trim().slice(0,120000)};
+  }
+  if(ext==='pdf'){
+    if(typeof pdfjsLib==='undefined')throw new Error('مكتبة PDF لم تُحمّل — تحقّق من الإنترنت');
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
+    let out='';
+    for(let p=1;p<=Math.min(doc.numPages,60);p++){
+      const page=await doc.getPage(p);
+      const tc=await page.getTextContent();
+      out+='\n\n[صفحة '+p+']\n'+tc.items.map(i=>i.str).join(' ');
+    }
+    const t=out.trim();
+    if(!t)throw new Error('PDF مصوَّر بلا نص — صوّره كصورة وأرفقها');
+    return {name,kind:'text',text:t.slice(0,120000)};
+  }
+  if(ext==='docx'){
+    if(typeof mammoth==='undefined')throw new Error('مكتبة Word لم تُحمّل — تحقّق من الإنترنت');
+    const r=await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()});
+    return {name,kind:'text',text:(r.value||'').trim().slice(0,120000)};
+  }
+  if(ext==='doc')throw new Error('صيغة doc القديمة غير مدعومة — احفظه بصيغة docx');
+  /* نصوص وجداول وكل ما يمكن قراءته نصًّا */
+  const txt=await f.text();
+  if(/�/.test(txt.slice(0,400)))throw new Error('ملف غير نصّي وغير مدعوم');
+  return {name,kind:'text',text:txt.slice(0,120000)};
+}
+function sfBase64(f){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(String(r.result).split(',')[1]);
+    r.onerror=()=>rej(new Error('تعذّرت قراءة الصورة'));
+    r.readAsDataURL(f);
+  });
+}
+
+/* السحب والإفلات */
+(function(){
+  document.addEventListener('DOMContentLoaded',()=>{
+    const d=document.getElementById('sf-drop'); if(!d)return;
+    ['dragenter','dragover'].forEach(ev=>d.addEventListener(ev,e=>{
+      e.preventDefault(); d.style.borderColor='var(--brand)'; d.style.background='var(--panel)';
+    }));
+    ['dragleave','drop'].forEach(ev=>d.addEventListener(ev,e=>{
+      e.preventDefault(); d.style.borderColor='var(--line)'; d.style.background='var(--panel2)';
+    }));
+    d.addEventListener('drop',e=>{ if(e.dataTransfer&&e.dataTransfer.files)sfAddFiles(e.dataTransfer.files); });
+  });
+})();
+
+/* تشغيل الدراسة */
+async function sfRun(){
+  const prompt=document.getElementById('sf-input').value.trim();
+  const usable=SF_FILES.filter(f=>!f.error);
+  if(!prompt&&!usable.length)return toast('⚠️ اكتب وصف المشروع أو أرفق ملفًا.','err');
+  const out=document.getElementById('sf-out');
+  out.innerHTML='<div class="card" style="text-align:center;padding:30px">'
+    +'<div style="font-size:30px">🧠</div>'
+    +'<div style="margin-top:10px;font-size:14px">جارٍ إعداد دراسة الجدوى...</div>'
+    +'<div style="margin-top:6px;font-size:12.5px;color:var(--muted)">يقرأ المرفقات ويحسب المؤشرات — قد يستغرق دقيقة إلى دقيقتين.</div></div>';
+  try{
+    const url=aiUrl();
+    if(!auth||!auth.currentUser)throw new Error('سجّل دخولك في اللوحة أولًا.');
+    const token=await auth.currentUser.getIdToken();
+    const res=await fetch(url,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({mode:'feasibility',prompt:prompt||'أعدّ دراسة جدوى بناءً على الملفات المرفقة.',files:usable})
+    });
+    const o=await res.json().catch(()=>({error:'رد غير مفهوم من الوسيط (HTTP '+res.status+')'}));
+    if(!res.ok||o.error)throw new Error(o.error||('HTTP '+res.status));
+    LAST_STUDY=o.study;
+    out.innerHTML=studyHtml(o.study);
+    if(o.truncated)toast('⚠️ الدراسة طويلة واقتُطع آخرها — قسّم الطلب.','err');
+  }catch(e){
+    out.innerHTML='<div class="card" style="border-color:var(--expense)">⚠️ '+esc(e.message)+'</div>';
+  }
+}
+
+/* ---------- عرض الدراسة ---------- */
+let LAST_STUDY=null;
+const TONE={good:{c:'#0ca30c',i:'▲'},warn:{c:'#fab219',i:'●'},bad:{c:'#d03b3b',i:'▼'},neutral:{c:'var(--muted)',i:'●'}};
+const SEV={'عالية':'#d03b3b','متوسطة':'#fab219','منخفضة':'#0ca30c'};
+
+function studyHtml(s){
+  if(!s)return '<div class="card">لا توجد نتيجة.</div>';
+  let h='<div id="study-doc">';
+
+  /* الغلاف */
+  h+='<div class="card" style="background:linear-gradient(135deg,#123a30,#16212e);border-color:var(--brand);padding:26px">'
+    +'<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">'
+    +'<div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--brand),var(--brand2));'
+    +'display:grid;place-items:center;font-size:26px;font-weight:800;color:#03271c;flex-shrink:0">أ</div>'
+    +'<div style="flex:1;min-width:200px"><h2 style="margin:0;font-size:21px">'+esc(s.title||'دراسة جدوى')+'</h2>'
+    +'<p style="margin:4px 0 0;color:var(--muted);font-size:13px">'+esc(s.subtitle||'')+'</p></div>'
+    +'<div style="text-align:end;font-size:11.5px;color:var(--muted);line-height:1.7">مشروع أثر<br>'+new Date().toLocaleDateString('en-CA')+'</div>'
+    +'</div>'
+    +(s.summary?'<p style="margin:18px 0 0;line-height:2;font-size:14px;color:#d8e2ec">'+esc(s.summary)+'</p>':'')
+    +'</div>';
+
+  /* المؤشرات */
+  if(s.kpis&&s.kpis.length){
+    h+='<h3 class="sec-title">المؤشرات الرئيسية</h3><div class="stat-row">';
+    s.kpis.forEach(k=>{
+      const t=TONE[k.tone]||TONE.neutral;
+      h+='<div class="stat" style="border-inline-start:3px solid '+t.c+'">'
+        +'<div class="v" style="font-size:22px">'+esc(k.value)+(k.unit?' <span style="font-size:12px;color:var(--muted)">'+esc(k.unit)+'</span>':'')+'</div>'
+        +'<div class="l">'+esc(k.label)+'</div>'
+        +(k.note?'<div style="font-size:11px;color:'+t.c+';margin-top:4px">'+t.i+' '+esc(k.note)+'</div>':'')
+        +'</div>';
+    });
+    h+='</div>';
+  }
+
+  /* الأقسام */
+  (s.sections||[]).forEach((sec,i)=>{
+    h+='<h3 class="sec-title">'+esc(sec.icon||'📌')+' '+esc(sec.heading||'')+'</h3><div class="card">';
+    if(sec.body)h+='<p style="margin:0;line-height:2;font-size:13.5px;white-space:pre-wrap">'+esc(sec.body)+'</p>';
+    if(sec.table&&sec.table.show&&sec.table.rows&&sec.table.rows.length){
+      if(sec.table.caption)h+='<div style="margin:16px 0 6px;font-size:12.5px;color:var(--muted)">'+esc(sec.table.caption)+'</div>';
+      h+='<div class="tbl-wrap"><table><thead><tr>';
+      (sec.table.columns||[]).forEach(c=>h+='<th>'+esc(c)+'</th>');
+      h+='</tr></thead><tbody>';
+      sec.table.rows.forEach(r=>{ h+='<tr>'; (r||[]).forEach(c=>h+='<td>'+esc(c)+'</td>'); h+='</tr>'; });
+      h+='</tbody></table></div>';
+    }
+    if(sec.chart&&sec.chart.show&&sec.chart.values&&sec.chart.values.length>1){
+      h+=studyChart(sec.chart,'sc'+i);
+    }
+    h+='</div>';
+  });
+
+  /* المخاطر */
+  if(s.risks&&s.risks.length){
+    h+='<h3 class="sec-title">⚠️ المخاطر وإجراءات التخفيف</h3><div class="card"><div class="tbl-wrap"><table>'
+      +'<thead><tr><th>الخطر</th><th>الشدّة</th><th>إجراء التخفيف</th></tr></thead><tbody>';
+    s.risks.forEach(r=>{
+      const c=SEV[r.severity]||'var(--muted)';
+      h+='<tr><td>'+esc(r.risk)+'</td>'
+        +'<td><span style="display:inline-flex;align-items:center;gap:5px;color:'+c+'">'
+        +'<span style="width:8px;height:8px;border-radius:50%;background:'+c+';display:inline-block"></span>'
+        +esc(r.severity)+'</span></td>'
+        +'<td>'+esc(r.mitigation)+'</td></tr>';
+    });
+    h+='</tbody></table></div></div>';
+  }
+
+  /* الافتراضات */
+  if(s.assumptions&&s.assumptions.length){
+    h+='<h3 class="sec-title">🧾 الافتراضات وما ينقص من بيانات</h3><div class="card">';
+    s.assumptions.forEach(a=>h+='<div style="margin:6px 0;font-size:13px;line-height:1.9;padding-inline-start:14px">• '+esc(a)+'</div>');
+    h+='</div>';
+  }
+
+  /* التوصية */
+  if(s.recommendation){
+    const t=TONE[s.recommendation.tone]||TONE.neutral;
+    h+='<h3 class="sec-title">✅ التوصية النهائية</h3>'
+      +'<div class="card" style="border-color:'+t.c+';border-inline-start-width:4px">'
+      +'<div style="font-size:16px;font-weight:700;color:'+t.c+';line-height:1.8">'+t.i+' '+esc(s.recommendation.verdict||'')+'</div>';
+    if((s.recommendation.reasons||[]).length){
+      h+='<div style="margin-top:14px;font-size:12.5px;color:var(--muted)">الأسباب</div>';
+      s.recommendation.reasons.forEach(r=>h+='<div style="margin:5px 0;font-size:13.5px;line-height:1.9">• '+esc(r)+'</div>');
+    }
+    if((s.recommendation.next_steps||[]).length){
+      h+='<div style="margin-top:14px;font-size:12.5px;color:var(--muted)">الخطوات التالية</div>';
+      s.recommendation.next_steps.forEach((r,i)=>h+='<div style="margin:5px 0;font-size:13.5px;line-height:1.9">'+(i+1)+'. '+esc(r)+'</div>');
+    }
+    h+='</div>';
+  }
+
+  h+='</div><div class="toolbar" style="margin-top:16px">'
+    +'<button class="btn" type="button" onclick="studyPrint()">🖨️ طباعة / PDF</button>'
+    +'<button class="btn ghost sm" type="button" onclick="studyCsv()">⬇️ تصدير الجداول CSV</button></div>';
+  return h;
+}
+
+/* رسم بياني — لون واحد + قيم مباشرة + جدول مكافئ */
+function studyChart(ch,id){
+  const vals=ch.values.map(v=>Number(v)||0), labs=ch.labels||[];
+  const max=Math.max(...vals,0), min=Math.min(...vals,0);
+  const W=760,H=260,PL=54,PR=16,PT=28,PB=44, iw=W-PL-PR, ih=H-PT-PB;
+  const hi=max===min?max+1:max, lo=Math.min(0,min);
+  const y=v=>PT+ih-((v-lo)/(hi-lo))*ih;
+  const HUE='#3987e5';
+  let g='';
+  for(let i=0;i<=4;i++){ const yy=PT+ih*(i/4); g+='<line x1="'+PL+'" y1="'+yy+'" x2="'+(W-PR)+'" y2="'+yy+'" stroke="#2c2c2a" stroke-width="1"/>'; }
+  let marks='';
+  if(ch.type==='line'){
+    const step=vals.length>1?iw/(vals.length-1):0;
+    const pts=vals.map((v,i)=>(PL+i*step)+','+y(v)).join(' ');
+    marks='<polyline points="'+pts+'" fill="none" stroke="'+HUE+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    vals.forEach((v,i)=>{
+      const cx=PL+i*step;
+      marks+='<circle cx="'+cx+'" cy="'+y(v)+'" r="4.5" fill="'+HUE+'" stroke="#16212e" stroke-width="2"><title>'+esc(labs[i]||'')+': '+nfmt(v)+'</title></circle>';
+      if(i===0||i===vals.length-1||v===max)
+        marks+='<text x="'+cx+'" y="'+(y(v)-12)+'" fill="#c3c2b7" font-size="11" text-anchor="middle">'+nfmt(v)+'</text>';
+    });
+  }else{
+    const bw=iw/vals.length, bar=Math.min(bw-8,54);
+    vals.forEach((v,i)=>{
+      const cx=PL+bw*i+bw/2, top=y(Math.max(v,0)), base=y(0), hgt=Math.max(Math.abs(base-top),2);
+      marks+='<rect x="'+(cx-bar/2)+'" y="'+Math.min(top,base)+'" width="'+bar+'" height="'+hgt+'" rx="4" fill="'+HUE+'"><title>'+esc(labs[i]||'')+': '+nfmt(v)+'</title></rect>'
+        +'<text x="'+cx+'" y="'+(Math.min(top,base)-7)+'" fill="#c3c2b7" font-size="11" text-anchor="middle">'+nfmt(v)+'</text>';
+    });
+  }
+  let ax='';
+  const step=ch.type==='line'?(vals.length>1?iw/(vals.length-1):0):iw/vals.length;
+  labs.forEach((l,i)=>{
+    const cx=ch.type==='line'?PL+i*step:PL+step*i+step/2;
+    if(labs.length<=12||i%Math.ceil(labs.length/12)===0)
+      ax+='<text x="'+cx+'" y="'+(H-18)+'" fill="#898781" font-size="11" text-anchor="middle">'+esc(String(l).slice(0,10))+'</text>';
+  });
+  ax+='<text x="'+(PL-8)+'" y="'+(y(hi)+4)+'" fill="#898781" font-size="10" text-anchor="end">'+nfmt(hi)+'</text>'
+     +'<text x="'+(PL-8)+'" y="'+(y(lo)+4)+'" fill="#898781" font-size="10" text-anchor="end">'+nfmt(lo)+'</text>'
+     +'<line x1="'+PL+'" y1="'+y(0)+'" x2="'+(W-PR)+'" y2="'+y(0)+'" stroke="#383835" stroke-width="1"/>';
+
+  let tbl='<div class="tbl-wrap" id="'+id+'-t" style="display:none;margin-top:10px"><table><thead><tr><th>البند</th><th>'+esc(ch.unit||'القيمة')+'</th></tr></thead><tbody>';
+  vals.forEach((v,i)=>tbl+='<tr><td>'+esc(labs[i]||'')+'</td><td>'+nfmt(v)+'</td></tr>');
+  tbl+='</tbody></table></div>';
+
+  return '<div style="margin-top:18px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+    +'<b style="font-size:13.5px">'+esc(ch.title||'')+(ch.unit?' <span style="font-weight:400;color:var(--muted);font-size:11.5px">('+esc(ch.unit)+')</span>':'')+'</b>'
+    +'<button class="btn ghost sm" type="button" onclick="var t=document.getElementById(\''+id+'-t\');t.style.display=t.style.display===\'none\'?\'\':\'none\'">جدول</button></div>'
+    +'<div style="overflow-x:auto"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:520px;height:auto" role="img">'+g+marks+ax+'</svg></div>'
+    +tbl+'</div>';
+}
+
+function studyPrint(){
+  const d=document.getElementById('study-doc'); if(!d)return;
+  const w=window.open('','_blank');
+  w.document.write('<html dir="rtl"><head><meta charset="utf-8"><title>'+esc((LAST_STUDY&&LAST_STUDY.title)||'دراسة جدوى')+'</title><style>'
+    +'body{font-family:Tahoma,sans-serif;padding:32px;line-height:1.9;color:#111;background:#fff}'
+    +'table{border-collapse:collapse;width:100%;margin:10px 0}th,td{border:1px solid #bbb;padding:7px;text-align:right;font-size:13px}'
+    +'th{background:#eef2f5}.card{border:1px solid #ddd;border-radius:10px;padding:16px;margin:10px 0;background:#fff!important}'
+    +'.sec-title{color:#1f8f6f;font-size:16px;margin:22px 0 8px;border-bottom:2px solid #e5e5e5;padding-bottom:5px}'
+    +'.stat-row{display:flex;flex-wrap:wrap;gap:10px}.stat{border:1px solid #ddd;border-radius:8px;padding:10px 14px;min-width:130px}'
+    +'.stat .v{font-size:18px;font-weight:700}.stat .l{font-size:11px;color:#666}'
+    +'svg{max-width:100%}h2{margin:0 0 4px}@page{margin:14mm}'
+    +'</style></head><body>'+d.innerHTML+'</body></html>');
+  w.document.close(); setTimeout(()=>w.print(),400);
+}
+function studyCsv(){
+  if(!LAST_STUDY)return;
+  let rows=[];
+  (LAST_STUDY.kpis||[]).forEach(k=>rows.push([k.label,k.value,k.unit]));
+  rows.push([]);
+  (LAST_STUDY.sections||[]).forEach(sec=>{
+    if(sec.table&&sec.table.show&&(sec.table.rows||[]).length){
+      rows.push([sec.heading]); rows.push(sec.table.columns||[]);
+      sec.table.rows.forEach(r=>rows.push(r)); rows.push([]);
+    }
+  });
+  const csv='﻿'+rows.map(r=>(r||[]).map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='دراسة-جدوى.csv'; a.click();
+  toast('✅ نُزّل ملف CSV.','ok');
 }
 
 /* ---- مولّد الذكاء الاصطناعي (عبر وسيط Cloudflare) ---- */
@@ -1753,6 +2101,9 @@ document.querySelectorAll('[id]').forEach(el=>{
 
 document.getElementById('ac-date').value=new Date().toISOString().slice(0,10);
 initTimeSelect(); agSetDate(0); gcAutoConnect(); aiBadge();
+document.getElementById('st-feas').style.display='none';
+document.getElementById('st-anal').style.display='none';
+document.getElementById('st-gen').style.display='none';
 FEAS=feasLoad();renderFeas();renderReqList();
 renderMk();renderBz();renderAcc();renderRs();renderReq();renderPeaks();initDesign();renderAgenda();newLetter();renderSecretary();renderHome();initAuth();
 </script>

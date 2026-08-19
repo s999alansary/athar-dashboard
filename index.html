@@ -996,6 +996,25 @@ const GC_SCOPE='https://www.googleapis.com/auth/calendar.events';
 const GC_TZ='Asia/Riyadh';
 let gcToken=null, gcTokenExp=0, gcClient=null;
 
+/* حفظ الإذن حتى لا يُطلب في كل مرة تُفتح فيها اللوحة */
+function gcStore(tok,exp){
+  gcToken=tok; gcTokenExp=exp;
+  try{
+    if(tok){ localStorage.setItem('athar_gctok',JSON.stringify({t:tok,e:exp})); localStorage.setItem('athar_gcauth','1'); }
+    else localStorage.removeItem('athar_gctok');
+  }catch(_){}
+}
+function gcRestore(){
+  try{
+    const raw=localStorage.getItem('athar_gctok'); if(!raw)return false;
+    const o=JSON.parse(raw);
+    if(o&&o.t&&Date.now()<o.e){ gcToken=o.t; gcTokenExp=o.e; return true; }
+    localStorage.removeItem('athar_gctok');
+  }catch(_){}
+  return false;
+}
+function gcEverAuthorized(){ try{ return localStorage.getItem('athar_gcauth')==='1'; }catch(_){ return false; } }
+
 /* Client ID الافتراضي لمشروع أثر — يمكن تجاوزه من بطاقة الإعدادات */
 const GC_DEFAULT_ID='509007437620-bcriebe5rukdlhnnn5d1sbg2fndcrlfp.apps.googleusercontent.com';
 function gcId(){ return ((localStorage.getItem('athar_gcid')||'').trim())||GC_DEFAULT_ID; }
@@ -1020,35 +1039,57 @@ function gcToggleSettings(){
 function gcSaveId(){
   const v=document.getElementById('gc-cid').value.trim();
   localStorage.setItem('athar_gcid',v);
-  gcToken=null; gcTokenExp=0; gcClient=null; gcBadge();
+  gcStore(null,0); gcClient=null; gcBadge();
   gcSay(v?'✅ تم الحفظ. اضغط «اربط حسابي في Google».':'🗑️ تم مسح الـ Client ID.');
 }
 function gcDisconnect(){
   if(gcToken&&window.google&&google.accounts&&google.accounts.oauth2){ try{ google.accounts.oauth2.revoke(gcToken); }catch(_){} }
-  gcToken=null; gcTokenExp=0; gcBadge(); gcSay('🔒 تم فصل الربط.'); renderAgenda();
+  gcStore(null,0);
+  try{ localStorage.removeItem('athar_gcauth'); }catch(_){}
+  gcBadge(); gcSay('🔒 تم فصل الربط. لن يُربط تلقائيًا بعد الآن حتى تضغط «اربط حسابي».'); renderAgenda();
 }
-function gcConnect(cb){
-  if(!gcSecure())return gcSay('⚠️ الربط التلقائي يحتاج رابط <b>https</b> (بعد النشر). استخدم الزر اليدوي حاليًا.');
+
+/* silent=true ← محاولة صامتة بلا نوافذ ولا رسائل إزعاج */
+function gcConnect(cb,silent){
+  const say=(m,t)=>{ if(!silent)gcSay(m,t); };
+  if(!gcSecure())return say('⚠️ الربط التلقائي يحتاج رابط <b>https</b>. افتح اللوحة من رابط الاستضافة، لا من الملف المحلي.','err');
   const cid=gcId();
-  if(!cid)return gcSay('⚠️ الصق الـ Client ID أولًا ثم اضغط حفظ.');
+  if(!cid)return say('⚠️ الصق الـ Client ID أولًا ثم اضغط حفظ.','err');
   if(!(window.google&&google.accounts&&google.accounts.oauth2))
-    return gcSay('⚠️ لم تُحمّل مكتبة Google (تحقّق من الإنترنت وحدّث الصفحة).');
-  gcSay('⏳ جارٍ فتح نافذة إذن Google...');
+    return say('⚠️ لم تُحمّل مكتبة Google (تحقّق من الإنترنت وحدّث الصفحة).','err');
+  say('⏳ جارٍ فتح نافذة إذن Google...');
   try{
     gcClient=google.accounts.oauth2.initTokenClient({
       client_id:cid, scope:GC_SCOPE,
       callback:(r)=>{
         if(r&&r.access_token){
-          gcToken=r.access_token;
-          gcTokenExp=Date.now()+((r.expires_in||3600)-60)*1000;
-          gcBadge(); gcSay('✅ تم الربط بنجاح — صار بإمكانك إضافة الاجتماعات تلقائيًا.','ok'); renderAgenda();
+          gcStore(r.access_token, Date.now()+((r.expires_in||3600)-60)*1000);
+          gcBadge(); renderAgenda();
+          if(silent)gcSay('✅ التقويم مربوط تلقائيًا — جاهز للإضافة.');
+          else gcSay('✅ تم الربط بنجاح — صار بإمكانك إضافة الاجتماعات تلقائيًا.','ok');
           if(typeof cb==='function')cb();
-        } else gcSay('⚠️ لم يتم منح الإذن.');
+        } else say('⚠️ لم يتم منح الإذن.','err');
       },
-      error_callback:(e)=>gcSay('⚠️ تعذّر الربط: '+((e&&e.type)||'خطأ غير معروف')+' — تأكّد أن رابط الموقع مضاف في «Authorized JavaScript origins».','err')
+      error_callback:(e)=>{
+        gcBadge();
+        say('⚠️ تعذّر الربط: '+((e&&e.type)||'خطأ غير معروف')+' — تأكّد أن رابط الموقع مضاف في «Authorized JavaScript origins».','err');
+      }
     });
-    gcClient.requestAccessToken({prompt:gcToken?'':'consent'});
-  }catch(e){ gcSay('⚠️ تعذّر بدء الربط: '+(e&&e.message||e)); }
+    /* '' = بلا شاشة موافقة إن كان الإذن ممنوحًا سابقًا */
+    gcClient.requestAccessToken({prompt: (silent||gcEverAuthorized()) ? '' : 'consent'});
+  }catch(e){ say('⚠️ تعذّر بدء الربط: '+(e&&e.message||e),'err'); }
+}
+
+/* يُستدعى عند فتح اللوحة */
+function gcAutoConnect(){
+  if(!gcSecure())return gcBadge();
+  if(gcRestore()){ gcBadge(); renderAgenda(); return; }   /* الإذن ما زال صالحًا */
+  if(!gcEverAuthorized())return gcBadge();                 /* لم يربط حسابه من قبل */
+  let tries=0;
+  const t=setInterval(()=>{
+    if(window.google&&google.accounts&&google.accounts.oauth2){ clearInterval(t); gcConnect(null,true); }
+    else if(++tries>25)clearInterval(t);                    /* مهلة 5 ثوانٍ لتحميل مكتبة Google */
+  },200);
 }
 function agTimes(x){
   const t=x.time||'09:00';
@@ -1061,7 +1102,12 @@ function agTimes(x){
 }
 async function gcAdd(id){
   const arr=DB.get('ag'), x=arr.find(a=>a.id===id); if(!x)return;
-  if(!gcConnected()){ document.getElementById('gc-settings').style.display=''; return gcConnect(()=>gcAdd(id)); }
+  if(!gcConnected()){
+    if(gcEverAuthorized()){ toast('⏳ جارٍ تجديد الإذن ثم الإضافة...'); return gcConnect(()=>gcAdd(id)); }
+    document.getElementById('gc-settings').style.display='';
+    toast('🔓 اربط حسابك في Google أولًا (مرة واحدة).');
+    return gcConnect(()=>gcAdd(id));
+  }
   const tm=agTimes(x);
   const body={
     summary:(x.type==='meeting'?'اجتماع: ':'مهمة: ')+x.title,
@@ -1083,7 +1129,11 @@ async function gcAdd(id){
     DB.set('ag',arr); renderAgenda();
     gcSay('✅ تمت إضافة «'+esc(x.title)+'» إلى تقويم Google يوم '+tm.start.slice(0,10)+' مع تذكير بريدي قبل ساعتين.','ok');
   }catch(e){
-    if(String(e.message).match(/401|invalid|credential/i)){ gcToken=null; gcTokenExp=0; gcBadge(); gcSay('⚠️ انتهت صلاحية الإذن — اضغط «اربط حسابي» مرة أخرى.','err'); }
+    if(String(e.message).match(/401|invalid|credential|unauthor/i)){
+      gcStore(null,0); gcBadge();
+      toast('⏳ انتهت صلاحية الإذن — جارٍ التجديد تلقائيًا...');
+      gcConnect(()=>gcAdd(id));
+    }
     else gcSay('⚠️ تعذّرت الإضافة: '+e.message,'err');
   }
 }
@@ -1554,7 +1604,7 @@ function delUserRole(email){
 
 /* init */
 document.getElementById('ac-date').value=new Date().toISOString().slice(0,10);
-initTimeSelect(); agSetDate(0);
+initTimeSelect(); agSetDate(0); gcAutoConnect();
 FEAS=feasLoad();renderFeas();renderReqList();
 renderMk();renderBz();renderAcc();renderRs();renderReq();renderPeaks();initDesign();renderAgenda();newLetter();renderSecretary();renderHome();initAuth();
 </script>

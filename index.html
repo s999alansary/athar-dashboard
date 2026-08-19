@@ -1603,6 +1603,15 @@ function delUserRole(email){
 }
 
 /* init */
+
+/* جسر المعرّفات: الشيفرة تستدعي الحقول بـ ag_type بينما معرّفها في الصفحة ag-type.
+   نعرّف لكل معرّف فيه شَرطة اسمًا مكافئًا بشُرطة سفلية يقرأ العنصر لحظيًا. */
+document.querySelectorAll('[id]').forEach(el=>{
+  const key=el.id.replace(/-/g,'_');
+  if(key===el.id || key in window)return;
+  Object.defineProperty(window,key,{get:()=>document.getElementById(el.id),configurable:true});
+});
+
 document.getElementById('ac-date').value=new Date().toISOString().slice(0,10);
 initTimeSelect(); agSetDate(0); gcAutoConnect();
 FEAS=feasLoad();renderFeas();renderReqList();

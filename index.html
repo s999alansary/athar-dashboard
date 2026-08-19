@@ -250,6 +250,45 @@
     <!-- ACCOUNTANT -->
     <section class="view" id="view-acc">
       <div class="topbar"><div><h2>🧮 المحاسب المبسّط</h2><p>سجّل الحركات المالية واحصل على تقرير فوري.</p></div></div>
+      <div class="tabs" id="ac-tabs">
+        <button class="active" onclick="acTab('ledger',this)">📒 دفتر المستودع</button>
+        <button onclick="acTab('gen',this)">🧾 الحركات العامة</button>
+      </div>
+
+      <!-- Warehouse ledger -->
+      <div id="ac-ledger">
+        <div class="card" style="margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px">
+              <span style="font-size:20px">📒</span>
+              <input id="lg-title" onchange="lgSaveTitle(this.value)" placeholder="اسم الدفتر"
+                style="font-size:16px;font-weight:700;background:transparent;border:none;border-bottom:1px dashed var(--line);border-radius:0;padding:4px 2px">
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn" type="button" onclick="lgAddRow()" title="إضافة صف جديد">＋ صف</button>
+              <button class="btn ghost sm" type="button" onclick="lgColDialog()" title="إضافة عمود جديد">🧩 عمود</button>
+              <button class="btn ghost sm" type="button" onclick="lgPrint()" title="طباعة">🖨️</button>
+              <button class="btn ghost sm" type="button" onclick="lgCsv()" title="تصدير Excel/CSV">⬇️</button>
+              <button class="btn ghost sm" type="button" onclick="lgHelp()" title="شرح الأدوات">❓</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat" style="border-inline-start:3px solid var(--income)"><div class="v money in" id="lg-debit">0</div><div class="l">إجمالي المدين (الوارد)</div></div>
+          <div class="stat" style="border-inline-start:3px solid var(--expense)"><div class="v money out" id="lg-credit">0</div><div class="l">إجمالي الدائن (المصروف)</div></div>
+          <div class="stat" style="border-inline-start:3px solid var(--brand)"><div class="v" id="lg-left">0</div><div class="l">المتبقي</div></div>
+          <div class="stat"><div class="v" id="lg-count">0</div><div class="l">عدد القيود</div></div>
+        </div>
+
+        <div class="tbl-wrap" style="margin-top:14px"><table id="lg-table"></table></div>
+        <p style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.9">
+          ✏️ اضغط على أي خانة لتعديلها مباشرة — يُحفظ تلقائيًا. المتبقي يُحسب فورًا (المدين − الدائن).
+        </p>
+      </div>
+
+      <!-- General movements -->
+      <div id="ac-gen" style="display:none">
       <div class="stat-row">
         <div class="stat"><div class="v money in" id="ac-in">0</div><div class="l">إجمالي الدخل</div></div>
         <div class="stat"><div class="v money out" id="ac-out">0</div><div class="l">إجمالي المصروفات</div></div>
@@ -273,6 +312,7 @@
       <div class="tbl-wrap"><table><thead><tr><th>الفئة</th><th>النوع</th><th>الإجمالي</th></tr></thead><tbody id="ac-report"></tbody></table></div>
       <h3 class="sec-title">كل الحركات</h3>
       <div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الفئة</th><th>المبلغ</th><th>ملاحظة</th><th></th></tr></thead><tbody id="ac-body"></tbody></table></div>
+      </div>
     </section>
 
     <!-- RESEARCH -->
@@ -1501,6 +1541,212 @@ function stExport(){
   }
 }
 
+/* ================= دفتر المستودع (المحاسب) ================= */
+const LG_CORE=[
+  {k:'debit', t:'مدين',        num:true,  hint:'المبلغ الوارد إليك'},
+  {k:'credit',t:'دائن',        num:true,  hint:'المبلغ المصروف'},
+  {k:'desc',  t:'التفاصيل',    wide:true, hint:'وصف البند'},
+  {k:'inv',   t:'رقم الفاتورة',hint:'أو «بدون»'},
+  {k:'note',  t:'ملاحظات',     wide:true, hint:'طريقة الدفع، التاريخ، المصدر...'}
+];
+function lgCols(){ try{ return JSON.parse(localStorage.getItem('athar_lgcols')||'[]'); }catch(_){ return []; } }
+function lgSetCols(v){ localStorage.setItem('athar_lgcols',JSON.stringify(v)); }
+function lgSaveTitle(v){ localStorage.setItem('athar_lgtitle',v); }
+function lgTitle(){ return localStorage.getItem('athar_lgtitle')||'فواتير مستودع مبادرة أثر'; }
+
+function acTab(which,btn){
+  document.querySelectorAll('#ac-tabs button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('ac-ledger').style.display=which==='ledger'?'':'none';
+  document.getElementById('ac-gen').style.display=which==='gen'?'':'none';
+}
+
+function renderLedger(){
+  const t=document.getElementById('lg-table'); if(!t)return;
+  const ti=document.getElementById('lg-title'); if(ti&&!ti.value)ti.value=lgTitle();
+  const rows=DB.get('lg'), extra=lgCols();
+
+  let h='<thead><tr><th style="width:44px">م</th>';
+  LG_CORE.forEach(c=>h+='<th title="'+esc(c.hint)+'">'+c.t+'</th>');
+  extra.forEach(c=>h+='<th title="عمود مخصّص">'+esc(c.name)
+    +' <button class="btn danger sm" type="button" style="padding:1px 5px;font-size:10px" onclick="lgDelCol(\''+c.id+'\')" title="حذف العمود">×</button></th>');
+  h+='<th style="width:52px"></th></tr></thead><tbody>';
+
+  let td=0,tc=0;
+  rows.forEach((r,i)=>{
+    td+=Number(r.debit)||0; tc+=Number(r.credit)||0;
+    h+='<tr><td style="color:var(--muted)">'+(i+1)+'</td>';
+    LG_CORE.forEach(c=>{
+      const v=r[c.k]==null?'':r[c.k];
+      const col=c.k==='debit'?'var(--income)':c.k==='credit'?'var(--expense)':'inherit';
+      h+='<td contenteditable="true" data-id="'+r.id+'" data-f="'+c.k+'" onblur="lgEdit(this)" onkeydown="lgKey(event)"'
+        +' style="min-width:'+(c.wide?'150px':'86px')+';color:'+col+';font-weight:'+(c.num?'700':'400')+';outline:none">'+esc(String(v))+'</td>';
+    });
+    extra.forEach(c=>{
+      const v=(r.ext&&r.ext[c.id])||'';
+      h+='<td contenteditable="true" data-id="'+r.id+'" data-f="ext:'+c.id+'" onblur="lgEdit(this)" onkeydown="lgKey(event)"'
+        +' style="min-width:110px;outline:none">'+esc(String(v))+'</td>';
+    });
+    h+='<td><button class="btn danger sm" type="button" onclick="lgDelRow(\''+r.id+'\')">حذف</button></td></tr>';
+  });
+  if(!rows.length)h+='<tr><td colspan="'+(LG_CORE.length+extra.length+2)+'" class="empty">لا توجد قيود بعد — اضغط «＋ صف» للبدء.</td></tr>';
+
+  h+='</tbody><tfoot><tr style="background:var(--panel2);font-weight:700">'
+    +'<td>—</td>'
+    +'<td style="color:var(--income)">'+fmt(td)+'</td>'
+    +'<td style="color:var(--expense)">'+fmt(tc)+'</td>'
+    +'<td colspan="'+(LG_CORE.length-2+extra.length+1)+'">المتبقي: <span style="color:var(--brand)">'+fmt(td-tc)+'</span> ريال</td>'
+    +'</tr></tfoot>';
+  t.innerHTML=h;
+
+  document.getElementById('lg-debit').textContent=fmt(td);
+  document.getElementById('lg-credit').textContent=fmt(tc);
+  document.getElementById('lg-left').textContent=fmt(td-tc);
+  document.getElementById('lg-count').textContent=rows.length;
+}
+
+function lgAddRow(){
+  const arr=DB.get('lg');
+  arr.push({id:uid(),debit:'',credit:'',desc:'',inv:'',note:'',ext:{}});
+  DB.set('lg',arr); renderLedger();
+  const tds=document.querySelectorAll('#lg-table tbody tr:last-child td[contenteditable]');
+  if(tds.length)tds[0].focus();
+}
+function lgDelRow(id){
+  if(!confirm('حذف هذا القيد؟'))return;
+  DB.set('lg',DB.get('lg').filter(x=>x.id!==id)); renderLedger();
+}
+function lgEdit(td){
+  const arr=DB.get('lg'), r=arr.find(x=>x.id===td.dataset.id); if(!r)return;
+  let v=td.textContent.trim();
+  const f=td.dataset.f;
+  if(f==='debit'||f==='credit'){
+    v=v.replace(/[^\d.\-]/g,'');
+    if(v&&isNaN(Number(v))){ toast('⚠️ أدخل رقمًا صحيحًا في خانة المبالغ.','err'); v=''; }
+  }
+  if(f.startsWith('ext:')){ r.ext=r.ext||{}; r.ext[f.slice(4)]=v; }
+  else r[f]=v;
+  DB.set('lg',arr); renderLedger();
+}
+function lgKey(e){ if(e.key==='Enter'){ e.preventDefault(); e.target.blur(); } }
+
+/* ---- مربع حوار عام ---- */
+function dlg(title,bodyHtml,onOk,okLabel){
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99998;display:grid;place-items:center;padding:16px';
+  ov.innerHTML='<div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;max-width:560px;width:100%;'
+    +'max-height:86vh;overflow:auto;box-shadow:0 18px 50px rgba(0,0,0,.5)">'
+    +'<div style="padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px">'
+    +'<b style="font-size:15.5px">'+title+'</b>'
+    +'<button class="btn ghost sm" type="button" data-x="1">✕</button></div>'
+    +'<div style="padding:18px;font-size:13.5px;line-height:1.9">'+bodyHtml+'</div>'
+    +'<div style="padding:14px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-start">'
+    +(onOk?'<button class="btn" type="button" data-ok="1">'+(okLabel||'حفظ')+'</button>':'')
+    +'<button class="btn ghost sm" type="button" data-x="1">'+(onOk?'إلغاء':'إغلاق')+'</button></div></div>';
+  const close=()=>ov.remove();
+  ov.addEventListener('click',e=>{
+    if(e.target===ov||e.target.dataset.x)close();
+    if(e.target.dataset.ok){ if(onOk(ov)!==false)close(); }
+  });
+  document.body.appendChild(ov);
+  const first=ov.querySelector('input,select,textarea'); if(first)first.focus();
+  return ov;
+}
+
+/* ---- إضافة عمود مخصّص ---- */
+function lgColDialog(){
+  dlg('🧩 إضافة عمود جديد',
+    '<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px">'
+    +'<b style="color:var(--brand)">ما وظيفة هذه الأداة؟</b><br>'
+    +'تضيف <b>عمودًا جديدًا</b> إلى جدول الدفتر لتسجيل معلومة لا تغطيها الأعمدة الحالية — '
+    +'مثل «اسم المورّد» أو «طريقة الدفع» أو «الموقع».'
+    +'<br><br><b style="color:var(--brand)">كيف تعمل؟</b><br>'
+    +'١. تكتب اسم العمود وتضغط «إضافة».<br>'
+    +'٢. يظهر العمود فورًا في نهاية الجدول لكل الصفوف.<br>'
+    +'٣. تضغط على أي خانة فيه لتكتب مباشرة، ويُحفظ تلقائيًا.<br>'
+    +'٤. لحذفه لاحقًا: اضغط <b>×</b> بجوار اسمه في رأس الجدول (تُحذف بياناته أيضًا).<br><br>'
+    +'<span style="color:var(--muted);font-size:12.5px">الأعمدة تظهر في الطباعة وتصدير Excel تلقائيًا.</span></div>'
+    +'<label>اسم العمود</label><input id="lg-newcol" placeholder="مثال: اسم المورّد" maxlength="28">',
+    (ov)=>{
+      const name=ov.querySelector('#lg-newcol').value.trim();
+      if(!name){ toast('⚠️ اكتب اسم العمود.','err'); return false; }
+      const cols=lgCols();
+      if(cols.length>=8){ toast('⚠️ الحد الأقصى ٨ أعمدة مخصّصة.','err'); return false; }
+      if(cols.some(c=>c.name===name)){ toast('⚠️ يوجد عمود بهذا الاسم.','err'); return false; }
+      cols.push({id:'c'+uid(),name}); lgSetCols(cols); renderLedger();
+      toast('✅ أُضيف عمود «'+esc(name)+'».','ok');
+    },'إضافة');
+}
+function lgDelCol(id){
+  const cols=lgCols(), c=cols.find(x=>x.id===id); if(!c)return;
+  if(!confirm('حذف عمود «'+c.name+'» وكل بياناته؟'))return;
+  lgSetCols(cols.filter(x=>x.id!==id));
+  const rows=DB.get('lg'); rows.forEach(r=>{ if(r.ext)delete r.ext[id]; }); DB.set('lg',rows);
+  renderLedger();
+}
+
+/* ---- شرح الأدوات ---- */
+function lgHelp(){
+  const row=(ic,t,d)=>'<div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)">'
+    +'<div style="font-size:20px;width:34px;flex-shrink:0;text-align:center">'+ic+'</div>'
+    +'<div><b>'+t+'</b><br><span style="color:var(--muted);font-size:12.5px">'+d+'</span></div></div>';
+  dlg('❓ شرح أدوات الدفتر',
+    '<p style="margin:0 0 14px">هذا الدفتر يسجّل الوارد والمصروف ويحسب المتبقي تلقائيًا — مثل جدول Excel لكن محفوظًا داخل اللوحة.</p>'
+    +row('＋ صف','إضافة قيد جديد','يضيف سطرًا فارغًا في نهاية الجدول وينقلك للكتابة فيه مباشرة.')
+    +row('🧩','إضافة عمود جديد','لتسجيل معلومة إضافية غير موجودة — مثل اسم المورّد أو طريقة الدفع.')
+    +row('🖨️','طباعة / PDF','يفتح نسخة بيضاء منسّقة للطباعة أو الحفظ كـ PDF.')
+    +row('⬇️','تصدير Excel','ينزّل الجدول بصيغة CSV تفتحها بـ Excel مباشرة بترميز عربي سليم.')
+    +row('✏️','التعديل المباشر','اضغط أي خانة واكتب فيها — تُحفظ فور خروجك منها. زر Enter ينهي التعديل.')
+    +row('🗑️','حذف','زر «حذف» في آخر كل صف يمسح القيد، و«×» في رأس العمود يمسح العمود.')
+    +'<div style="margin-top:16px;background:var(--panel2);border-radius:10px;padding:12px;font-size:12.5px;line-height:1.9">'
+    +'<b style="color:var(--brand)">الفرق بين مدين ودائن</b><br>'
+    +'<b style="color:var(--income)">مدين</b> = المبالغ التي <b>وصلتك</b> (حوالة، عهدة، تمويل).<br>'
+    +'<b style="color:var(--expense)">دائن</b> = المبالغ التي <b>صرفتها</b> (فواتير، مشتريات).<br>'
+    +'<b style="color:var(--brand)">المتبقي</b> = المدين − الدائن، ويتحدّث لحظيًا مع كل تعديل.</div>');
+}
+
+function lgPrint(){
+  const rows=DB.get('lg'), extra=lgCols();
+  let td=0,tc=0;
+  let h='<h2>'+esc(lgTitle())+'</h2><table><thead><tr><th>م</th>';
+  LG_CORE.forEach(c=>h+='<th>'+c.t+'</th>');
+  extra.forEach(c=>h+='<th>'+esc(c.name)+'</th>');
+  h+='</tr></thead><tbody>';
+  rows.forEach((r,i)=>{
+    td+=Number(r.debit)||0; tc+=Number(r.credit)||0;
+    h+='<tr><td>'+(i+1)+'</td>';
+    LG_CORE.forEach(c=>h+='<td>'+esc(String(r[c.k]==null?'':r[c.k]))+'</td>');
+    extra.forEach(c=>h+='<td>'+esc(String((r.ext&&r.ext[c.id])||''))+'</td>');
+    h+='</tr>';
+  });
+  h+='<tr class="tot"><td>—</td><td>'+fmt(td)+'</td><td>'+fmt(tc)+'</td>'
+    +'<td colspan="'+(LG_CORE.length-2+extra.length)+'">المتبقي: '+fmt(td-tc)+' ريال</td></tr>'
+    +'</tbody></table><p style="margin-top:18px;font-size:12px;color:#666">مشروع أثر — '+new Date().toLocaleDateString('en-CA')+'</p>';
+  const w=window.open('','_blank');
+  w.document.write('<html dir="rtl"><head><meta charset="utf-8"><title>'+esc(lgTitle())+'</title><style>'
+    +'body{font-family:Tahoma,sans-serif;padding:28px;color:#111}h2{text-align:center;margin:0 0 18px}'
+    +'table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:6px 8px;text-align:center;font-size:13px}'
+    +'th{background:#eef2f5}.tot{background:#f4f4f4;font-weight:700}@page{margin:12mm}'
+    +'</style></head><body>'+h+'</body></html>');
+  w.document.close(); setTimeout(()=>w.print(),300);
+}
+function lgCsv(){
+  const rows=DB.get('lg'), extra=lgCols();
+  const head=['م'].concat(LG_CORE.map(c=>c.t)).concat(extra.map(c=>c.name));
+  const out=[head];
+  let td=0,tc=0;
+  rows.forEach((r,i)=>{
+    td+=Number(r.debit)||0; tc+=Number(r.credit)||0;
+    out.push([i+1].concat(LG_CORE.map(c=>r[c.k]==null?'':r[c.k])).concat(extra.map(c=>(r.ext&&r.ext[c.id])||'')));
+  });
+  out.push([]); out.push(['الإجمالي',td,tc]); out.push(['المتبقي',td-tc]);
+  const csv='﻿'+out.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=lgTitle().replace(/[\\/:*?"<>|]/g,'-')+'.csv'; a.click();
+  toast('✅ نُزّل الملف — افتحه بـ Excel.','ok');
+}
+
 /* ================= دراسة الجدوى الذكية ================= */
 let SF_FILES=[];
 const SF_MAXMB=8;
@@ -2105,7 +2351,7 @@ document.getElementById('st-feas').style.display='none';
 document.getElementById('st-anal').style.display='none';
 document.getElementById('st-gen').style.display='none';
 FEAS=feasLoad();renderFeas();renderReqList();
-renderMk();renderBz();renderAcc();renderRs();renderReq();renderPeaks();initDesign();renderAgenda();newLetter();renderSecretary();renderHome();initAuth();
+renderMk();renderBz();renderAcc();renderLedger();renderRs();renderReq();renderPeaks();initDesign();renderAgenda();newLetter();renderSecretary();renderHome();initAuth();
 </script>
 </body>
 </html>

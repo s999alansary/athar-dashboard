@@ -1549,6 +1549,69 @@ const LG_CORE=[
   {k:'inv',   t:'رقم الفاتورة',hint:'أو «بدون»'},
   {k:'note',  t:'ملاحظات',     wide:true, hint:'طريقة الدفع، التاريخ، المصدر...'}
 ];
+/* مخزن مرفقات الفواتير — IndexedDB (يتحمّل ملفات كبيرة بعكس localStorage) */
+const LDB={
+  _db:null,
+  open(){return new Promise((res,rej)=>{ if(LDB._db)return res(LDB._db);
+    const r=indexedDB.open('athar_ledger',1);
+    r.onupgradeneeded=e=>{const db=e.target.result; if(!db.objectStoreNames.contains('att'))db.createObjectStore('att',{keyPath:'id'});};
+    r.onsuccess=e=>{LDB._db=e.target.result;res(LDB._db);};
+    r.onerror=()=>rej(r.error||new Error('تعذّر فتح مخزن المرفقات'));
+  });},
+  async put(rec){const db=await LDB.open();return new Promise((res,rej)=>{const t=db.transaction('att','readwrite');t.objectStore('att').put(rec);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});},
+  async get(id){const db=await LDB.open();return new Promise((res,rej)=>{const rq=db.transaction('att','readonly').objectStore('att').get(id);rq.onsuccess=()=>res(rq.result||null);rq.onerror=()=>rej(rq.error);});},
+  async del(id){const db=await LDB.open();return new Promise((res,rej)=>{const t=db.transaction('att','readwrite');t.objectStore('att').delete(id);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});}
+};
+const LG_ATT_MAXMB=15;
+
+function lgAttachPick(rowId){
+  const inp=document.createElement('input');
+  inp.type='file';
+  /* بلا قيود — يقبل أي نوع ملف أو صورة */
+  inp.onchange=async()=>{
+    const f=inp.files&&inp.files[0]; if(!f)return;
+    if(f.size>LG_ATT_MAXMB*1024*1024)return toast('⚠️ الملف أكبر من '+LG_ATT_MAXMB+' ميجابايت.','err');
+    try{
+      const arr=DB.get('lg'), r=arr.find(x=>x.id===rowId); if(!r)return;
+      if(r.attId)await LDB.del(r.attId).catch(()=>{});
+      const attId='a'+uid();
+      await LDB.put({id:attId,name:f.name,type:f.type||'',size:f.size,blob:f});
+      r.attId=attId; r.attName=f.name; r.attType=f.type||''; r.attSize=f.size;
+      DB.set('lg',arr); renderLedger();
+      toast('📎 أُرفق «'+esc(f.name)+'».','ok');
+    }catch(e){ toast('⚠️ تعذّر حفظ المرفق: '+esc(e.message||e),'err'); }
+  };
+  inp.click();
+}
+async function lgAttachView(rowId){
+  const r=DB.get('lg').find(x=>x.id===rowId); if(!r||!r.attId)return;
+  try{
+    const rec=await LDB.get(r.attId);
+    if(!rec)return toast('⚠️ المرفق غير موجود — ربما حُذف من هذا الجهاز.','err');
+    const url=URL.createObjectURL(rec.blob);
+    const isImg=/^image\//.test(rec.type||'');
+    const body=(isImg
+        ? '<img src="'+url+'" alt="'+esc(rec.name)+'" style="max-width:100%;border-radius:10px;display:block">'
+        : '<div style="text-align:center;padding:22px 0"><div style="font-size:42px">📄</div>'
+          +'<div style="margin-top:8px;font-size:13.5px">'+esc(rec.name)+'</div></div>')
+      +'<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'
+      +'<a class="btn ghost sm" href="'+url+'" target="_blank" rel="noopener">↗️ فتح في تبويب</a>'
+      +'<a class="btn ghost sm" href="'+url+'" download="'+esc(rec.name)+'">⬇️ تنزيل</a>'
+      +'<button class="btn danger sm" type="button" onclick="lgAttachDel(\''+rowId+'\')">🗑️ إزالة المرفق</button></div>'
+      +'<div style="margin-top:10px;font-size:12px;color:var(--muted)">الحجم: '+fmt(Math.round((rec.size||0)/1024))+' كيلوبايت</div>';
+    dlg('📎 '+esc(rec.name),body,null,null,()=>URL.revokeObjectURL(url));
+  }catch(e){ toast('⚠️ تعذّر فتح المرفق: '+esc(e.message||e),'err'); }
+}
+async function lgAttachDel(rowId){
+  const arr=DB.get('lg'), r=arr.find(x=>x.id===rowId); if(!r||!r.attId)return;
+  if(!confirm('إزالة المرفق من هذا القيد؟'))return;
+  await LDB.del(r.attId).catch(()=>{});
+  delete r.attId; delete r.attName; delete r.attType; delete r.attSize;
+  DB.set('lg',arr); renderLedger();
+  document.querySelectorAll('[data-dlg]').forEach(x=>x.remove());
+  toast('🗑️ أُزيل المرفق.','ok');
+}
+
 function lgCols(){ try{ return JSON.parse(localStorage.getItem('athar_lgcols')||'[]'); }catch(_){ return []; } }
 function lgSetCols(v){ localStorage.setItem('athar_lgcols',JSON.stringify(v)); }
 function lgSaveTitle(v){ localStorage.setItem('athar_lgtitle',v); }
@@ -1568,6 +1631,7 @@ function renderLedger(){
 
   let h='<thead><tr><th style="width:44px">م</th>';
   LG_CORE.forEach(c=>h+='<th title="'+esc(c.hint)+'">'+c.t+'</th>');
+  h+='<th style="width:96px" title="أرفق صورة الفاتورة أو أي ملف">المرفق</th>';
   extra.forEach(c=>h+='<th title="عمود مخصّص">'+esc(c.name)
     +' <button class="btn danger sm" type="button" style="padding:1px 5px;font-size:10px" onclick="lgDelCol(\''+c.id+'\')" title="حذف العمود">×</button></th>');
   h+='<th style="width:52px"></th></tr></thead><tbody>';
@@ -1582,6 +1646,11 @@ function renderLedger(){
       h+='<td contenteditable="true" data-id="'+r.id+'" data-f="'+c.k+'" onblur="lgEdit(this)" onkeydown="lgKey(event)"'
         +' style="min-width:'+(c.wide?'150px':'86px')+';color:'+col+';font-weight:'+(c.num?'700':'400')+';outline:none">'+esc(String(v))+'</td>';
     });
+    h+='<td style="white-space:nowrap">'+(r.attId
+      ? '<button class="btn ghost sm" type="button" onclick="lgAttachView(\''+r.id+'\')" title="'+esc(r.attName||'')+'">'
+        +(/^image\//.test(r.attType||'')?'🖼️':'📄')+' عرض</button>'
+      : '<button class="btn ghost sm" type="button" onclick="lgAttachPick(\''+r.id+'\')" title="إرفاق ملف">📎 إرفاق</button>')
+      +'</td>';
     extra.forEach(c=>{
       const v=(r.ext&&r.ext[c.id])||'';
       h+='<td contenteditable="true" data-id="'+r.id+'" data-f="ext:'+c.id+'" onblur="lgEdit(this)" onkeydown="lgKey(event)"'
@@ -1589,13 +1658,13 @@ function renderLedger(){
     });
     h+='<td><button class="btn danger sm" type="button" onclick="lgDelRow(\''+r.id+'\')">حذف</button></td></tr>';
   });
-  if(!rows.length)h+='<tr><td colspan="'+(LG_CORE.length+extra.length+2)+'" class="empty">لا توجد قيود بعد — اضغط «＋ صف» للبدء.</td></tr>';
+  if(!rows.length)h+='<tr><td colspan="'+(LG_CORE.length+extra.length+3)+'" class="empty">لا توجد قيود بعد — اضغط «＋ صف» للبدء.</td></tr>';
 
   h+='</tbody><tfoot><tr style="background:var(--panel2);font-weight:700">'
     +'<td>—</td>'
     +'<td style="color:var(--income)">'+fmt(td)+'</td>'
     +'<td style="color:var(--expense)">'+fmt(tc)+'</td>'
-    +'<td colspan="'+(LG_CORE.length-2+extra.length+1)+'">المتبقي: <span style="color:var(--brand)">'+fmt(td-tc)+'</span> ريال</td>'
+    +'<td colspan="'+(LG_CORE.length-2+extra.length+2)+'">المتبقي: <span style="color:var(--brand)">'+fmt(td-tc)+'</span> ريال</td>'
     +'</tr></tfoot>';
   t.innerHTML=h;
 
@@ -1614,6 +1683,8 @@ function lgAddRow(){
 }
 function lgDelRow(id){
   if(!confirm('حذف هذا القيد؟'))return;
+  const r=DB.get('lg').find(x=>x.id===id);
+  if(r&&r.attId)LDB.del(r.attId).catch(()=>{});
   DB.set('lg',DB.get('lg').filter(x=>x.id!==id)); renderLedger();
 }
 function lgEdit(td){
@@ -1631,8 +1702,9 @@ function lgEdit(td){
 function lgKey(e){ if(e.key==='Enter'){ e.preventDefault(); e.target.blur(); } }
 
 /* ---- مربع حوار عام ---- */
-function dlg(title,bodyHtml,onOk,okLabel){
+function dlg(title,bodyHtml,onOk,okLabel,onClose){
   const ov=document.createElement('div');
+  ov.dataset.dlg='1';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99998;display:grid;place-items:center;padding:16px';
   ov.innerHTML='<div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;max-width:560px;width:100%;'
     +'max-height:86vh;overflow:auto;box-shadow:0 18px 50px rgba(0,0,0,.5)">'
@@ -1643,7 +1715,7 @@ function dlg(title,bodyHtml,onOk,okLabel){
     +'<div style="padding:14px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-start">'
     +(onOk?'<button class="btn" type="button" data-ok="1">'+(okLabel||'حفظ')+'</button>':'')
     +'<button class="btn ghost sm" type="button" data-x="1">'+(onOk?'إلغاء':'إغلاق')+'</button></div></div>';
-  const close=()=>ov.remove();
+  const close=()=>{ ov.remove(); if(typeof onClose==='function')onClose(); };
   ov.addEventListener('click',e=>{
     if(e.target===ov||e.target.dataset.x)close();
     if(e.target.dataset.ok){ if(onOk(ov)!==false)close(); }
@@ -1696,6 +1768,7 @@ function lgHelp(){
     +row('🧩','إضافة عمود جديد','لتسجيل معلومة إضافية غير موجودة — مثل اسم المورّد أو طريقة الدفع.')
     +row('🖨️','طباعة / PDF','يفتح نسخة بيضاء منسّقة للطباعة أو الحفظ كـ PDF.')
     +row('⬇️','تصدير Excel','ينزّل الجدول بصيغة CSV تفتحها بـ Excel مباشرة بترميز عربي سليم.')
+    +row('📎','إرفاق فاتورة','في عمود «المرفق» اضغط «📎 إرفاق» واختر أي ملف أو صورة — بلا قيود على النوع. بعدها يتحول الزر إلى «عرض» لفتح المرفق أو تنزيله أو إزالته. الملفات تُحفظ داخل متصفح هذا الجهاز (حتى ١٥ ميجابايت للملف).')
     +row('✏️','التعديل المباشر','اضغط أي خانة واكتب فيها — تُحفظ فور خروجك منها. زر Enter ينهي التعديل.')
     +row('🗑️','حذف','زر «حذف» في آخر كل صف يمسح القيد، و«×» في رأس العمود يمسح العمود.')
     +'<div style="margin-top:16px;background:var(--panel2);border-radius:10px;padding:12px;font-size:12.5px;line-height:1.9">'
@@ -1710,17 +1783,19 @@ function lgPrint(){
   let td=0,tc=0;
   let h='<h2>'+esc(lgTitle())+'</h2><table><thead><tr><th>م</th>';
   LG_CORE.forEach(c=>h+='<th>'+c.t+'</th>');
+  h+='<th>المرفق</th>';
   extra.forEach(c=>h+='<th>'+esc(c.name)+'</th>');
   h+='</tr></thead><tbody>';
   rows.forEach((r,i)=>{
     td+=Number(r.debit)||0; tc+=Number(r.credit)||0;
     h+='<tr><td>'+(i+1)+'</td>';
     LG_CORE.forEach(c=>h+='<td>'+esc(String(r[c.k]==null?'':r[c.k]))+'</td>');
+    h+='<td>'+(r.attName?'📎 '+esc(r.attName):'—')+'</td>';
     extra.forEach(c=>h+='<td>'+esc(String((r.ext&&r.ext[c.id])||''))+'</td>');
     h+='</tr>';
   });
   h+='<tr class="tot"><td>—</td><td>'+fmt(td)+'</td><td>'+fmt(tc)+'</td>'
-    +'<td colspan="'+(LG_CORE.length-2+extra.length)+'">المتبقي: '+fmt(td-tc)+' ريال</td></tr>'
+    +'<td colspan="'+(LG_CORE.length-2+extra.length+1)+'">المتبقي: '+fmt(td-tc)+' ريال</td></tr>'
     +'</tbody></table><p style="margin-top:18px;font-size:12px;color:#666">مشروع أثر — '+new Date().toLocaleDateString('en-CA')+'</p>';
   const w=window.open('','_blank');
   w.document.write('<html dir="rtl"><head><meta charset="utf-8"><title>'+esc(lgTitle())+'</title><style>'
@@ -1732,12 +1807,12 @@ function lgPrint(){
 }
 function lgCsv(){
   const rows=DB.get('lg'), extra=lgCols();
-  const head=['م'].concat(LG_CORE.map(c=>c.t)).concat(extra.map(c=>c.name));
+  const head=['م'].concat(LG_CORE.map(c=>c.t)).concat(['المرفق']).concat(extra.map(c=>c.name));
   const out=[head];
   let td=0,tc=0;
   rows.forEach((r,i)=>{
     td+=Number(r.debit)||0; tc+=Number(r.credit)||0;
-    out.push([i+1].concat(LG_CORE.map(c=>r[c.k]==null?'':r[c.k])).concat(extra.map(c=>(r.ext&&r.ext[c.id])||'')));
+    out.push([i+1].concat(LG_CORE.map(c=>r[c.k]==null?'':r[c.k])).concat([r.attName||'']).concat(extra.map(c=>(r.ext&&r.ext[c.id])||'')));
   });
   out.push([]); out.push(['الإجمالي',td,tc]); out.push(['المتبقي',td-tc]);
   const csv='﻿'+out.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');

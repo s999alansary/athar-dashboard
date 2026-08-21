@@ -149,6 +149,9 @@
   img,svg,video,canvas{max-width:100%}
   .hero-text{min-width:0}
   .stat,.card,.tool-card{min-width:0}
+  /* أي عنصر داخل شبكة أو فليكس لا يتمدّد فوق عرض الشاشة */
+  .app>*,.view,.card,.tbl-wrap,.stat-row,.grid,.form-row,.toolbar,.tabs{min-width:0;max-width:100%}
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .stat .v,.tool-card h3,.tool-card p{overflow-wrap:anywhere}
 
   /* ===== تحسينات الجوال (أندرويد و آيفون) ===== */
@@ -268,6 +271,11 @@
     </nav>
     <div id="sess-box" style="margin-top:16px;font-size:12.5px;color:var(--muted);display:none">
       <div id="sess-info"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <span id="sync-pill" class="pill y">☁️ غير متصل</span>
+        <button class="btn ghost sm" type="button" onclick="syncPull(true)" title="اسحب أحدث البيانات">⬇️</button>
+        <button class="btn ghost sm" type="button" onclick="syncPushAll()" title="ارفع بيانات هذا الجهاز">⬆️</button>
+      </div>
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
         <button class="btn ghost sm" id="btn-access" style="display:none" onclick="openAccess()">🔑 الصلاحيات</button>
         <button class="btn ghost sm" onclick="logout()">🚪 خروج</button>
@@ -832,9 +840,94 @@ try{
   (window.__showErr||function(m){alert(m);})('⚠️ تعذّر الاتصال بـ Firebase: '+(e&&e.message||e)+'. حدّث الصفحة (Ctrl+Shift+R).');
 }
 const OWNER_EMAIL='s.999.alansary@gmail.com';
+/* ===== مزامنة البيانات بين كل الأجهزة (Firestore) ===== */
+const SYNC_KEYS=['athar_mk','athar_bz','athar_ac','athar_rs','athar_rq','athar_ag',
+                 'athar_lt','athar_lg','athar_dreq','athar_lgcols','athar_lgtitle','athar_feas'];
+const _syncT={};
+let SYNC_READY=false;
+
+function syncAt(k){ return Number(localStorage.getItem('at_'+k)||0); }
+function syncBadge(state){
+  const b=document.getElementById('sync-pill'); if(!b)return;
+  const m={busy:['y','⏳ مزامنة...'],ok:['g','☁️ متزامن'],err:['y','⚠️ محلي فقط'],off:['y','☁️ غير متصل']};
+  const s=m[state]||m.off; b.className='pill '+s[0]; b.textContent=s[1];
+}
+function syncOn(){ return !!(fdb&&auth&&auth.currentUser); }
+
+/* يرفع مفتاحًا واحدًا بعد توقّف التعديل بثانية — يمنع إغراق السحابة */
+function syncPush(k){
+  if(SYNC_KEYS.indexOf(k)<0)return;
+  const stamp=Date.now();
+  localStorage.setItem('at_'+k,String(stamp));
+  if(!syncOn()||!SYNC_READY)return;
+  clearTimeout(_syncT[k]);
+  _syncT[k]=setTimeout(()=>{
+    syncBadge('busy');
+    fdb.collection('sync').doc(k).set({
+      v:localStorage.getItem(k)||'',
+      at:syncAt(k),
+      by:(auth.currentUser&&auth.currentUser.email)||''
+    }).then(()=>syncBadge('ok')).catch(()=>syncBadge('err'));
+  },1100);
+}
+
+/* يسحب كل البيانات — الأحدث زمنيًا يفوز */
+async function syncPull(loud){
+  if(!syncOn()){ syncBadge('off'); if(loud)toast('⚠️ سجّل دخولك أولًا.','err'); return 0; }
+  syncBadge('busy');
+  let changed=0,failed=0;
+  for(const k of SYNC_KEYS){
+    try{
+      const d=await fdb.collection('sync').doc(k).get();
+      if(!d.exists)continue;
+      const o=d.data();
+      if(!o||typeof o.v!=='string')continue;
+      if(Number(o.at||0)>syncAt(k)){
+        localStorage.setItem(k,o.v);
+        localStorage.setItem('at_'+k,String(o.at));
+        changed++;
+      }
+    }catch(_){ failed++; }
+  }
+  SYNC_READY=true;
+  syncBadge(failed?'err':'ok');
+  if(changed)refreshAll();
+  if(loud){
+    if(failed)toast('⚠️ تعذّرت مزامنة '+failed+' عنصرًا — راجع قواعد Firestore.','err');
+    else toast(changed?('☁️ حُدّث '+changed+' قسمًا من السحابة.'):'✅ كل شيء محدَّث.','ok');
+  }
+  return changed;
+}
+
+/* يرفع كل ما هو محلي إلى السحابة (أول مرة أو بعد انقطاع) */
+async function syncPushAll(){
+  if(!syncOn())return toast('⚠️ سجّل دخولك أولًا.','err');
+  syncBadge('busy');
+  let n=0;
+  for(const k of SYNC_KEYS){
+    const v=localStorage.getItem(k);
+    if(v==null)continue;
+    try{
+      await fdb.collection('sync').doc(k).set({v,at:syncAt(k)||Date.now(),by:(auth.currentUser&&auth.currentUser.email)||''});
+      n++;
+    }catch(_){}
+  }
+  syncBadge(n?'ok':'err');
+  toast(n?('☁️ رُفع '+n+' قسمًا للسحابة.'):'⚠️ تعذّر الرفع — راجع قواعد Firestore.',n?'ok':'err');
+}
+
+/* يعيد رسم كل الأقسام بعد وصول بيانات جديدة */
+function refreshAll(){
+  try{
+    renderMk();renderBz();renderAcc();renderLedger();renderRs();renderReq();
+    renderAgenda();renderSecretary();renderReqList();dgHistory();
+    FEAS=feasLoad();renderFeas();renderHome();
+  }catch(_){}
+}
+
 const DB={
   get:(k)=>JSON.parse(localStorage.getItem('athar_'+k)||'[]'),
-  set:(k,v)=>localStorage.setItem('athar_'+k,JSON.stringify(v))
+  set:(k,v)=>{ localStorage.setItem('athar_'+k,JSON.stringify(v)); syncPush('athar_'+k); }
 };
 const fmt=n=>Number(n||0).toLocaleString('en-US');
 const uid=()=>Date.now()+''+Math.floor(Math.random()*999);
@@ -1595,7 +1688,7 @@ function svgLine(pts,opts){
 }
 /* Feasibility */
 function feasLoad(){ try{const d=JSON.parse(localStorage.getItem('athar_feas')); if(d&&d.capital)return d;}catch(e){} return {name:'',months:12,capital:[{t:'',a:0}],opex:[{t:'',a:0}],rev:[{t:'',a:0}]}; }
-function feasSave(d){ localStorage.setItem('athar_feas',JSON.stringify(d)); }
+function feasSave(d){ localStorage.setItem('athar_feas',JSON.stringify(d)); syncPush('athar_feas'); }
 function feasName(v){ FEAS.name=v; feasSave(FEAS); }
 function feasMonths(v){ FEAS.months=Math.max(1,+v||12); feasSave(FEAS); computeFeas(); }
 function feasAdd(list){ FEAS[list].push({t:'',a:0}); feasSave(FEAS); renderFeas(); }
@@ -2149,8 +2242,8 @@ async function lgAttachDel(rowId){
 }
 
 function lgCols(){ try{ return JSON.parse(localStorage.getItem('athar_lgcols')||'[]'); }catch(_){ return []; } }
-function lgSetCols(v){ localStorage.setItem('athar_lgcols',JSON.stringify(v)); }
-function lgSaveTitle(v){ localStorage.setItem('athar_lgtitle',v); }
+function lgSetCols(v){ localStorage.setItem('athar_lgcols',JSON.stringify(v)); syncPush('athar_lgcols'); }
+function lgSaveTitle(v){ localStorage.setItem('athar_lgtitle',v); syncPush('athar_lgtitle'); }
 function lgTitle(){ return localStorage.getItem('athar_lgtitle')||'فواتير مستودع مبادرة أثر'; }
 
 function acTab(which,btn){
@@ -2926,6 +3019,7 @@ function initAuth(){
       let role='employee';
       try{ role=await loadRole(email); }catch(e){}
       CUR.role=role; applyAccess();
+      syncPull(false);                    /* اسحب أحدث البيانات من السحابة */
     }else{
       CUR=null;
       document.getElementById('sess-box').style.display='none';

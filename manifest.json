@@ -1,0 +1,18 @@
+{
+  "name": "لوحة تحكم مبادرة أثر",
+  "short_name": "أثر",
+  "description": "لوحة تحكم مبادرة أثر — التسويق والتصميم والمحاسبة ودراسات الجدوى",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1720",
+  "theme_color": "#0f1720",
+  "icons": [
+    { "src": "app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

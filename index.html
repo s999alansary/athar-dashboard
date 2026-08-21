@@ -30,7 +30,12 @@
   .nav{margin-top:22px;display:flex;flex-direction:column;gap:6px}
   .nav button{display:flex;align-items:center;gap:11px;background:transparent;border:1px solid transparent;color:var(--muted);
     padding:11px 13px;border-radius:11px;cursor:pointer;font-size:15px;font-family:inherit;text-align:start;transition:.15s}
-  .nav button .ic{font-size:18px;width:22px;text-align:center}
+  .nav button .ic{width:26px;height:26px;display:grid;place-items:center;flex-shrink:0}
+  /* أيقونات ثلاثية الأبعاد */
+  .ico{width:100%;height:100%;display:block;overflow:visible}
+  .nav button .ico{filter:drop-shadow(0 2px 3px rgba(0,0,0,.5));transition:transform .18s ease,filter .18s ease}
+  .nav button:hover .ico{transform:translateY(-1px) scale(1.06)}
+  .nav button.active .ico{transform:scale(1.08);filter:drop-shadow(0 3px 5px rgba(0,0,0,.6))}
   .nav button:hover{background:var(--panel);color:var(--text)}
   .nav button.active{background:var(--panel2);color:#fff;border-color:var(--line);box-shadow:inset 3px 0 0 var(--brand)}
   .side-foot{position:absolute;bottom:18px;inset-inline:16px;color:var(--muted);font-size:11.5px;line-height:1.7}
@@ -72,7 +77,11 @@
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
   .tool-card{cursor:pointer;transition:.15s}
   .tool-card:hover{transform:translateY(-3px);border-color:var(--brand)}
-  .tool-card .ic{font-size:30px}
+  .tool-card .ic{width:54px;height:54px;margin-bottom:10px;
+    filter:drop-shadow(0 6px 10px rgba(0,0,0,.45));
+    transition:transform .22s cubic-bezier(.2,.8,.3,1.2),filter .22s ease}
+  .tool-card:hover .ic{transform:translateY(-4px) rotate(-3deg) scale(1.07);
+    filter:drop-shadow(0 12px 16px rgba(0,0,0,.55)) drop-shadow(0 0 16px rgba(46,204,155,.25))}
   .tool-card h3{margin:12px 0 6px;font-size:17px}
   .tool-card p{margin:0;color:var(--muted);font-size:13px;line-height:1.6}
   .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px}
@@ -123,7 +132,7 @@
     .main{padding:14px 11px}
     .stat .v{font-size:20px}
     .btn{padding:11px 15px}
-    .tool-card .ic{font-size:26px}
+    .tool-card .ic{width:44px;height:44px}
   }
   /* Sub-tools */
   .subtools{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-bottom:18px}
@@ -180,6 +189,164 @@
 </style>
 </head>
 <body>
+
+<!-- ===== أيقونات ثلاثية الأبعاد (متجهية) ===== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="gFace" x1="0" y1="0" x2="0.35" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".34"/>
+    <stop offset=".48" stop-color="#fff" stop-opacity=".06"/>
+    <stop offset="1" stop-color="#000" stop-opacity=".22"/>
+  </linearGradient>
+  <linearGradient id="gGloss" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".55"/>
+    <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="gGlyph" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dfeee8"/>
+  </linearGradient>
+  <filter id="fLift" x="-40%" y="-40%" width="180%" height="190%">
+    <feDropShadow dx="0" dy="2.4" stdDeviation="2" flood-color="#000" flood-opacity=".45"/>
+    <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#000" flood-opacity=".30"/>
+  </filter>
+  <filter id="fGlyph" x="-30%" y="-30%" width="160%" height="170%">
+    <feDropShadow dx="0" dy="1.2" stdDeviation=".9" flood-color="#08201a" flood-opacity=".55"/>
+  </filter>
+
+  <linearGradient id="h-home" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3ddba6"/><stop offset="1" stop-color="#0e7350"/></linearGradient>
+  <linearGradient id="h-mkt"  x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffab52"/><stop offset="1" stop-color="#c05a08"/></linearGradient>
+  <linearGradient id="h-dsg"  x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f08ac6"/><stop offset="1" stop-color="#9c2f72"/></linearGradient>
+  <linearGradient id="h-agn"  x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#63a9ff"/><stop offset="1" stop-color="#1a56b0"/></linearGradient>
+  <linearGradient id="h-sec"  x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4ad6d0"/><stop offset="1" stop-color="#0d7a76"/></linearGradient>
+  <linearGradient id="h-std"  x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#47dcae"/><stop offset="1" stop-color="#0c8264"/></linearGradient>
+  <linearGradient id="h-biz"  x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8fe25a"/><stop offset="1" stop-color="#3a8412"/></linearGradient>
+  <linearGradient id="h-acc"  x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7cf5f"/><stop offset="1" stop-color="#a97706"/></linearGradient>
+  <linearGradient id="h-rsc"  x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b49bff"/><stop offset="1" stop-color="#5c31c9"/></linearGradient>
+  <linearGradient id="h-pks"  x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#63c6ff"/><stop offset="1" stop-color="#1569ad"/></linearGradient>
+  <linearGradient id="h-req"  x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9b7c"/><stop offset="1" stop-color="#b83c1d"/></linearGradient>
+
+  <g id="tile"><rect x="4" y="3" width="56" height="56" rx="16"/></g>
+</defs>
+
+<symbol id="ic-home" viewBox="0 0 64 64"><g filter="url(#fLift)">
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#h-home)"/>
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#gFace)"/>
+  <path d="M8 14a11 11 0 0 1 11-11h26a11 11 0 0 1 11 11v6c-8-5-40-5-48 0z" fill="url(#gGloss)"/>
+  <rect x="4.8" y="3.8" width="54.4" height="54.4" rx="15.4" fill="none" stroke="#fff" stroke-opacity=".30"/>
+  <g filter="url(#fGlyph)" fill="url(#gGlyph)">
+    <path d="M32 15 15 29v18a3 3 0 0 0 3 3h9V38h10v12h9a3 3 0 0 0 3-3V29z"/>
+  </g></g></symbol>
+
+<symbol id="ic-mkt" viewBox="0 0 64 64"><g filter="url(#fLift)">
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#h-mkt)"/>
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#gFace)"/>
+  <path d="M8 14a11 11 0 0 1 11-11h26a11 11 0 0 1 11 11v6c-8-5-40-5-48 0z" fill="url(#gGloss)"/>
+  <rect x="4.8" y="3.8" width="54.4" height="54.4" rx="15.4" fill="none" stroke="#fff" stroke-opacity=".30"/>
+  <g filter="url(#fGlyph)" fill="url(#gGlyph)">
+    <path d="M44 15v34l-19-8v-18z"/><path d="M22 25h-4a5 5 0 0 0-5 5v4a5 5 0 0 0 5 5h4z"/>
+    <path d="M18 41h5l2 9h-5z"/><rect x="47" y="29" width="7" height="6" rx="3"/>
+  </g></g></symbol>
+
+<symbol id="ic-dsg" viewBox="0 0 64 64"><g filter="url(#fLift)">
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#h-dsg)"/>
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#gFace)"/>
+  <path d="M8 14a11 11 0 0 1 11-11h26a11 11 0 0 1 11 11v6c-8-5-40-5-48 0z" fill="url(#gGloss)"/>
+  <rect x="4.8" y="3.8" width="54.4" height="54.4" rx="15.4" fill="none" stroke="#fff" stroke-opacity=".30"/>
+  <g filter="url(#fGlyph)">
+    <path d="M32 14c-10 0-18 7-18 16 0 10 8 16 18 16 3 0 4-2 3-4-1-3 1-5 4-5h4c5 0 7-3 7-8 0-8-8-15-18-15z" fill="url(#gGlyph)"/>
+    <circle cx="24" cy="25" r="3" fill="#a3357a"/><circle cx="33" cy="21" r="3" fill="#7a2a5c"/><circle cx="41" cy="26" r="3" fill="#5f2049"/>
+  </g></g></symbol>
+
+<symbol id="ic-agn" viewBox="0 0 64 64"><g filter="url(#fLift)">
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#h-agn)"/>
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#gFace)"/>
+  <path d="M8 14a11 11 0 0 1 11-11h26a11 11 0 0 1 11 11v6c-8-5-40-5-48 0z" fill="url(#gGloss)"/>
+  <rect x="4.8" y="3.8" width="54.4" height="54.4" rx="15.4" fill="none" stroke="#fff" stroke-opacity=".30"/>
+  <g filter="url(#fGlyph)">
+    <rect x="14" y="18" width="36" height="32" rx="5" fill="url(#gGlyph)"/>
+    <rect x="14" y="18" width="36" height="9" rx="5" fill="#1a56b0"/>
+    <rect x="21" y="13" width="4" height="10" rx="2" fill="#eaf2ff"/><rect x="39" y="13" width="4" height="10" rx="2" fill="#eaf2ff"/>
+    <rect x="20" y="32" width="7" height="6" rx="2" fill="#4f8fe0"/><rect x="30" y="32" width="7" height="6" rx="2" fill="#4f8fe0"/>
+    <rect x="40" y="32" width="6" height="6" rx="2" fill="#4f8fe0"/><rect x="20" y="41" width="7" height="6" rx="2" fill="#7fb0ea"/>
+  </g></g></symbol>
+
+<symbol id="ic-sec" viewBox="0 0 64 64"><g filter="url(#fLift)">
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#h-sec)"/>
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#gFace)"/>
+  <path d="M8 14a11 11 0 0 1 11-11h26a11 11 0 0 1 11 11v6c-8-5-40-5-48 0z" fill="url(#gGloss)"/>
+  <rect x="4.8" y="3.8" width="54.4" height="54.4" rx="15.4" fill="none" stroke="#fff" stroke-opacity=".30"/>
+  <g filter="url(#fGlyph)">
+    <path d="M17 13h20l11 11v27a4 4 0 0 1-4 4H17a4 4 0 0 1-4-4V17a4 4 0 0 1 4-4z" fill="url(#gGlyph)"/>
+    <path d="M37 13l11 11H41a4 4 0 0 1-4-4z" fill="#bfe8e6"/>
+    <rect x="20" y="30" width="22" height="3" rx="1.5" fill="#0d7a76" opacity=".55"/>
+    <rect x="20" y="37" width="22" height="3" rx="1.5" fill="#0d7a76" opacity=".55"/>
+    <rect x="20" y="44" width="14" height="3" rx="1.5" fill="#0d7a76" opacity=".55"/>
+  </g></g></symbol>
+
+<symbol id="ic-std" viewBox="0 0 64 64"><g filter="url(#fLift)">
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#h-std)"/>
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#gFace)"/>
+  <path d="M8 14a11 11 0 0 1 11-11h26a11 11 0 0 1 11 11v6c-8-5-40-5-48 0z" fill="url(#gGloss)"/>
+  <rect x="4.8" y="3.8" width="54.4" height="54.4" rx="15.4" fill="none" stroke="#fff" stroke-opacity=".30"/>
+  <g filter="url(#fGlyph)" fill="url(#gGlyph)">
+    <rect x="16" y="32" width="8" height="18" rx="3"/><rect x="28" y="22" width="8" height="28" rx="3"/><rect x="40" y="27" width="8" height="23" rx="3"/>
+    <rect x="14" y="52" width="36" height="3" rx="1.5" opacity=".7"/>
+  </g></g></symbol>
+
+<symbol id="ic-biz" viewBox="0 0 64 64"><g filter="url(#fLift)">
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#h-biz)"/>
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#gFace)"/>
+  <path d="M8 14a11 11 0 0 1 11-11h26a11 11 0 0 1 11 11v6c-8-5-40-5-48 0z" fill="url(#gGloss)"/>
+  <rect x="4.8" y="3.8" width="54.4" height="54.4" rx="15.4" fill="none" stroke="#fff" stroke-opacity=".30"/>
+  <g filter="url(#fGlyph)">
+    <path d="M15 42l10-11 7 6 12-15" fill="none" stroke="url(#gGlyph)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M35 20h11v11" fill="none" stroke="url(#gGlyph)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="14" y="48" width="36" height="3.5" rx="1.75" fill="url(#gGlyph)" opacity=".75"/>
+  </g></g></symbol>
+
+<symbol id="ic-acc" viewBox="0 0 64 64"><g filter="url(#fLift)">
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#h-acc)"/>
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#gFace)"/>
+  <path d="M8 14a11 11 0 0 1 11-11h26a11 11 0 0 1 11 11v6c-8-5-40-5-48 0z" fill="url(#gGloss)"/>
+  <rect x="4.8" y="3.8" width="54.4" height="54.4" rx="15.4" fill="none" stroke="#fff" stroke-opacity=".30"/>
+  <g filter="url(#fGlyph)">
+    <rect x="16" y="12" width="32" height="40" rx="6" fill="url(#gGlyph)"/>
+    <rect x="21" y="17" width="22" height="8" rx="2.5" fill="#8a6205"/>
+    <g fill="#a97706"><rect x="21" y="29" width="6" height="6" rx="2"/><rect x="29" y="29" width="6" height="6" rx="2"/><rect x="37" y="29" width="6" height="6" rx="2"/>
+    <rect x="21" y="39" width="6" height="6" rx="2"/><rect x="29" y="39" width="6" height="6" rx="2"/><rect x="37" y="39" width="6" height="6" rx="2"/></g>
+  </g></g></symbol>
+
+<symbol id="ic-rsc" viewBox="0 0 64 64"><g filter="url(#fLift)">
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#h-rsc)"/>
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#gFace)"/>
+  <path d="M8 14a11 11 0 0 1 11-11h26a11 11 0 0 1 11 11v6c-8-5-40-5-48 0z" fill="url(#gGloss)"/>
+  <rect x="4.8" y="3.8" width="54.4" height="54.4" rx="15.4" fill="none" stroke="#fff" stroke-opacity=".30"/>
+  <g filter="url(#fGlyph)">
+    <circle cx="29" cy="28" r="12" fill="none" stroke="url(#gGlyph)" stroke-width="5"/>
+    <circle cx="29" cy="28" r="9" fill="#fff" opacity=".22"/>
+    <path d="M38 37l9 9" stroke="url(#gGlyph)" stroke-width="6" stroke-linecap="round"/>
+  </g></g></symbol>
+
+<symbol id="ic-pks" viewBox="0 0 64 64"><g filter="url(#fLift)">
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#h-pks)"/>
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#gFace)"/>
+  <path d="M8 14a11 11 0 0 1 11-11h26a11 11 0 0 1 11 11v6c-8-5-40-5-48 0z" fill="url(#gGloss)"/>
+  <rect x="4.8" y="3.8" width="54.4" height="54.4" rx="15.4" fill="none" stroke="#fff" stroke-opacity=".30"/>
+  <g filter="url(#fGlyph)">
+    <path d="M14 45l9-13 8 7 8-16 11 12" fill="none" stroke="url(#gGlyph)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="39" cy="23" r="4.5" fill="url(#gGlyph)"/>
+  </g></g></symbol>
+
+<symbol id="ic-req" viewBox="0 0 64 64"><g filter="url(#fLift)">
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#h-req)"/>
+  <rect x="4" y="3" width="56" height="56" rx="16" fill="url(#gFace)"/>
+  <path d="M8 14a11 11 0 0 1 11-11h26a11 11 0 0 1 11 11v6c-8-5-40-5-48 0z" fill="url(#gGloss)"/>
+  <rect x="4.8" y="3.8" width="54.4" height="54.4" rx="15.4" fill="none" stroke="#fff" stroke-opacity=".30"/>
+  <g filter="url(#fGlyph)" fill="url(#gGlyph)">
+    <path d="M32 12a3 3 0 0 1 3 3v13h5.5a1.6 1.6 0 0 1 1.2 2.7l-8.5 9.6a3 3 0 0 1-4.4 0l-8.5-9.6A1.6 1.6 0 0 1 21.5 28H27V15a3 3 0 0 1 3-3z"/>
+    <path d="M15 40h6l3 6h16l3-6h6v8a4 4 0 0 1-4 4H19a4 4 0 0 1-4-4z" opacity=".9"/>
+  </g></g></symbol>
+</svg>
+
 <div class="app">
   <!-- Sidebar -->
   <aside class="side">
@@ -188,15 +355,15 @@
       <div><h1>مبادرة أثر</h1><small>لوحة التحكم</small></div>
     </div>
     <nav class="nav" id="nav">
-      <button data-view="home" class="active"><span class="ic">🏠</span> الرئيسية</button>
-      <button data-view="marketing"><span class="ic">📣</span> التسويق</button>
-      <button data-view="design"><span class="ic">🎨</span> التصميم</button>
-      <button data-view="agenda"><span class="ic">🗓️</span> المهام والاجتماعات</button>
-      <button data-view="secretary"><span class="ic">📝</span> السكرتارية</button>
-      <button data-view="study"><span class="ic">📊</span> دراسة الجدوى والتحليل</button>
-      <button data-view="biz"><span class="ic">📈</span> تطوير العمل</button>
-      <button data-view="acc"><span class="ic">🧮</span> المحاسب المبسّط</button>
-      <button data-view="research"><span class="ic">🔎</span> البحث</button>
+      <button data-view="home" class="active"><span class="ic"><svg class="ico"><use href="#ic-home"/></svg></span> الرئيسية</button>
+      <button data-view="marketing"><span class="ic"><svg class="ico"><use href="#ic-mkt"/></svg></span> التسويق</button>
+      <button data-view="design"><span class="ic"><svg class="ico"><use href="#ic-dsg"/></svg></span> التصميم</button>
+      <button data-view="agenda"><span class="ic"><svg class="ico"><use href="#ic-agn"/></svg></span> المهام والاجتماعات</button>
+      <button data-view="secretary"><span class="ic"><svg class="ico"><use href="#ic-sec"/></svg></span> السكرتارية</button>
+      <button data-view="study"><span class="ic"><svg class="ico"><use href="#ic-std"/></svg></span> دراسة الجدوى والتحليل</button>
+      <button data-view="biz"><span class="ic"><svg class="ico"><use href="#ic-biz"/></svg></span> تطوير العمل</button>
+      <button data-view="acc"><span class="ic"><svg class="ico"><use href="#ic-acc"/></svg></span> المحاسب المبسّط</button>
+      <button data-view="research"><span class="ic"><svg class="ico"><use href="#ic-rsc"/></svg></span> البحث</button>
     </nav>
     <div id="sess-box" style="margin-top:16px;font-size:12.5px;color:var(--muted);display:none">
       <div id="sess-info"></div>
@@ -233,14 +400,14 @@
         <div class="stat"><div class="v" id="st-files">0</div><div class="l">ملفات التصميم</div></div>
       </div>
       <div class="grid home">
-        <div class="card tool-card" data-goto="marketing"><div class="ic">📣</div><h3>التسويق</h3><p>إدارة الحملات على سناب شات وتيك توك وإنستقرام وتتبّع نتائجها.</p></div>
-        <div class="card tool-card" data-goto="design"><div class="ic">🎨</div><h3>التصميم</h3><p>ارفع واحفظ الصور والفيديوهات وملفات PDF وWord وكل أنواع الملفات في مكان واحد.</p></div>
-        <div class="card tool-card" data-goto="agenda"><div class="ic">🗓️</div><h3>المهام والاجتماعات</h3><p>أضِف مهامك واجتماعاتك بالكتابة أو بالتسجيل الصوتي، وأرسلها لتقويم Google وبريدك.</p></div>
-        <div class="card tool-card" data-goto="secretary"><div class="ic">📝</div><h3>السكرتارية</h3><p>اكتب الخطابات الرسمية واحفظها، مع نماذج جاهزة، وطباعة وتصدير Word.</p></div>
-        <div class="card tool-card" data-goto="study"><div class="ic">📊</div><h3>دراسة الجدوى والتحليل</h3><p>حوّل أي بيانات إلى جداول ومؤشرات ورسوم بيانية دقيقة، وادرس جدوى مشاريعك ماليًا.</p></div>
-        <div class="card tool-card" data-goto="biz"><div class="ic">📈</div><h3>تطوير العمل</h3><p>أفكار ومهام لتحسين التشغيل والتوسّع، مع أولوياتها وحالتها.</p></div>
-        <div class="card tool-card" data-goto="acc"><div class="ic">🧮</div><h3>المحاسب المبسّط</h3><p>تسجيل الدخل والمصروفات واستخراج تقارير مالية فورية.</p></div>
-        <div class="card tool-card" data-goto="research"><div class="ic">🔎</div><h3>البحث</h3><p>حفظ نقاط البحث والمصادر (جهات شراء السكراب، الإسفنج... إلخ).</p></div>
+        <div class="card tool-card" data-goto="marketing"><div class="ic"><svg class="ico"><use href="#ic-mkt"/></svg></div><h3>التسويق</h3><p>إدارة الحملات على سناب شات وتيك توك وإنستقرام وتتبّع نتائجها.</p></div>
+        <div class="card tool-card" data-goto="design"><div class="ic"><svg class="ico"><use href="#ic-dsg"/></svg></div><h3>التصميم</h3><p>ارفع واحفظ الصور والفيديوهات وملفات PDF وWord وكل أنواع الملفات في مكان واحد.</p></div>
+        <div class="card tool-card" data-goto="agenda"><div class="ic"><svg class="ico"><use href="#ic-agn"/></svg></div><h3>المهام والاجتماعات</h3><p>أضِف مهامك واجتماعاتك بالكتابة أو بالتسجيل الصوتي، وأرسلها لتقويم Google وبريدك.</p></div>
+        <div class="card tool-card" data-goto="secretary"><div class="ic"><svg class="ico"><use href="#ic-sec"/></svg></div><h3>السكرتارية</h3><p>اكتب الخطابات الرسمية واحفظها، مع نماذج جاهزة، وطباعة وتصدير Word.</p></div>
+        <div class="card tool-card" data-goto="study"><div class="ic"><svg class="ico"><use href="#ic-std"/></svg></div><h3>دراسة الجدوى والتحليل</h3><p>حوّل أي بيانات إلى جداول ومؤشرات ورسوم بيانية دقيقة، وادرس جدوى مشاريعك ماليًا.</p></div>
+        <div class="card tool-card" data-goto="biz"><div class="ic"><svg class="ico"><use href="#ic-biz"/></svg></div><h3>تطوير العمل</h3><p>أفكار ومهام لتحسين التشغيل والتوسّع، مع أولوياتها وحالتها.</p></div>
+        <div class="card tool-card" data-goto="acc"><div class="ic"><svg class="ico"><use href="#ic-acc"/></svg></div><h3>المحاسب المبسّط</h3><p>تسجيل الدخل والمصروفات واستخراج تقارير مالية فورية.</p></div>
+        <div class="card tool-card" data-goto="research"><div class="ic"><svg class="ico"><use href="#ic-rsc"/></svg></div><h3>البحث</h3><p>حفظ نقاط البحث والمصادر (جهات شراء السكراب، الإسفنج... إلخ).</p></div>
       </div>
     </section>
 
@@ -248,8 +415,8 @@
     <section class="view" id="view-marketing">
       <div class="topbar"><div><h2>📣 التسويق</h2><p>سجّل حملاتك التسويقية وتابع أداءها.</p></div></div>
       <div class="subtools">
-        <div class="card tool-card subtool" data-goto="peaks"><div class="ic">📊</div><h3>أوقات الذروة والمنصات</h3><p>أفضل الأوقات للنشر على سناب وتيك توك وإنستقرام، وتوصية اللحظة الحالية للإعلانات.</p></div>
-        <div class="card tool-card subtool" data-goto="requests"><div class="ic">📥</div><h3>طلبات المنصة</h3><p>صفحة الطلبات — تُدار يدويًا الآن وستُربط لاحقًا بمصدر بياناتها.</p></div>
+        <div class="card tool-card subtool" data-goto="peaks"><div class="ic"><svg class="ico"><use href="#ic-pks"/></svg></div><h3>أوقات الذروة والمنصات</h3><p>أفضل الأوقات للنشر على سناب وتيك توك وإنستقرام، وتوصية اللحظة الحالية للإعلانات.</p></div>
+        <div class="card tool-card subtool" data-goto="requests"><div class="ic"><svg class="ico"><use href="#ic-req"/></svg></div><h3>طلبات المنصة</h3><p>صفحة الطلبات — تُدار يدويًا الآن وستُربط لاحقًا بمصدر بياناتها.</p></div>
       </div>
       <h3 class="sec-title">تسجيل حملة جديدة</h3>
       <div class="card">

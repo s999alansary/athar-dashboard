@@ -382,13 +382,69 @@
         <div><h2>🎨 التصميم</h2><p>ارفع واحفظ كل أنواع الصور والفيديوهات وملفات PDF وWord وغيرها.</p></div>
         <div class="stat" style="padding:9px 16px"><div class="v" id="dz-count" style="font-size:18px">0</div><div class="l" id="dz-size">0 ب</div></div>
       </div>
-      <div class="drop" id="drop">
-        <div class="big">⬆️</div>
-        <div style="margin-top:8px">اسحب الملفات هنا أو <b style="color:var(--brand)">اضغط للاختيار</b></div>
-        <div style="font-size:12px;margin-top:6px">صور • فيديو • PDF • Word • Excel • أي ملف — تُحفظ داخل متصفحك على هذا الجهاز</div>
-        <input type="file" id="file-in" multiple accept="*/*" style="display:none">
+      <div class="tabs" id="dg-tabs">
+        <button class="active" onclick="dgTab('studio',this)">🪄 استوديو التصميم الذكي</button>
+        <button onclick="dgTab('files',this)">📁 مكتبة الملفات</button>
       </div>
-      <div class="files-grid" id="files-grid"></div>
+
+      <!-- AI design studio -->
+      <div id="dg-studio">
+        <div class="card" style="border-color:var(--accent)">
+          <div class="form-row" style="margin-bottom:4px">
+            <div style="grid-column:1/-2"><label>١) ماذا تريد أن أصمّم؟</label>
+              <textarea id="dg-req" style="min-height:110px;font-size:14px"
+                placeholder="مثال: ملصق لجانب دينا نقل التبرعات. شعار «مشروع أثر» كبير على اليمين، وجملة «تبرعك العيني يصنع أثرًا» بخط ضخم، ورقم واتساب أسفل. الألوان أخضر وذهبي، وطابع عصري نظيف."></textarea>
+            </div>
+            <div><label>٢) نوع المساحة</label>
+              <select id="dg-canvas">
+                <option value="جانب دينا / شاحنة صغيرة (4000×1800 مم)">🚚 جانب دينا</option>
+                <option value="جانب باص كبير (12000×3000 مم)">🚌 جانب باص</option>
+                <option value="خلفية مركبة (2000×1500 مم)">🚐 خلفية مركبة</option>
+                <option value="لوحة إعلانية (3000×1000 مم)">🪧 لوحة إعلانية</option>
+                <option value="منشور إنستقرام مربّع (1080×1080)">📱 منشور سوشيال</option>
+                <option value="ستوري عمودي (1080×1920)">📲 ستوري</option>
+                <option value="شعار / أيقونة (1000×1000)">✨ شعار</option>
+                <option value="بروشور A4 عمودي (2480×3508)">📄 بروشور A4</option>
+              </select>
+            </div>
+          </div>
+
+          <label style="margin-top:10px">٣) مراجع بصرية (اختياري) — صورة سيارتك، شعارك، أو تصميم يعجبك</label>
+          <div id="dg-drop" onclick="document.getElementById('dg-files').click()"
+            style="border:2px dashed var(--line);border-radius:12px;padding:16px;text-align:center;cursor:pointer;background:var(--panel2)">
+            <span style="font-size:22px">🖼️</span>
+            <span style="font-size:13px;margin-inline-start:8px">اسحب الصور هنا أو اضغط — يراها ويبني عليها</span>
+          </div>
+          <input type="file" id="dg-files" multiple accept="image/*" style="display:none" onchange="dgAddRefs(this.files)">
+          <div id="dg-refs" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
+
+          <div class="toolbar" style="margin-top:14px">
+            <button class="btn" type="button" onclick="dgRun(false)">🪄 صمّم</button>
+            <button class="btn ghost sm" type="button" onclick="dgRun(true)" id="dg-evolve" style="display:none">🔁 طوّر النسخة الحالية</button>
+            <button class="btn ghost sm" type="button" onclick="dgCritique()" id="dg-crit" style="display:none">🔍 انقد وحسّن تلقائيًا</button>
+            <button class="btn ghost sm" type="button" onclick="dgHelp()">❓</button>
+          </div>
+          <p style="margin:10px 0 0;font-size:12px;color:var(--muted);line-height:1.9">
+            🔁 «طوّر» يبني على النسخة الحالية ولا يبدأ من الصفر — كل ما أعجبك يبقى كما هو.
+          </p>
+        </div>
+
+        <div id="dg-out" style="margin-top:16px"></div>
+
+        <h3 class="sec-title" id="dg-hist-title" style="display:none">📚 سجل النسخ</h3>
+        <div id="dg-hist" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))"></div>
+      </div>
+
+      <!-- File library -->
+      <div id="dg-files-tab" style="display:none">
+        <div class="drop" id="drop">
+          <div class="big">⬆️</div>
+          <div style="margin-top:8px">اسحب الملفات هنا أو <b style="color:var(--brand)">اضغط للاختيار</b></div>
+          <div style="font-size:12px;margin-top:6px">صور • فيديو • PDF • Word • Excel • أي ملف — تُحفظ داخل متصفحك على هذا الجهاز</div>
+          <input type="file" id="file-in" multiple accept="*/*" style="display:none">
+        </div>
+        <div class="files-grid" id="files-grid"></div>
+      </div>
     </section>
 
     <!-- AGENDA (Tasks & Meetings + Gmail) -->
@@ -1544,6 +1600,241 @@ function stExport(){
   }
 }
 
+/* ================= استوديو التصميم الذكي ================= */
+let DG_REFS=[], DG_CUR=null;
+
+function dgTab(which,btn){
+  document.querySelectorAll('#dg-tabs button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('dg-studio').style.display=which==='studio'?'':'none';
+  document.getElementById('dg-files-tab').style.display=which==='files'?'':'none';
+}
+
+/* ---- تعقيم SVG: يمنع أي كود قابل للتنفيذ داخل التصميم ---- */
+function svgClean(svg){
+  let s=String(svg||'');
+  const i=s.indexOf('<svg'); if(i>0)s=s.slice(i);
+  s=s.replace(/<\s*script[\s\S]*?<\s*\/\s*script\s*>/gi,'')
+     .replace(/<\s*foreignObject[\s\S]*?<\s*\/\s*foreignObject\s*>/gi,'')
+     .replace(/\son[a-z]+\s*=\s*"[^"]*"/gi,'')
+     .replace(/\son[a-z]+\s*=\s*'[^']*'/gi,'')
+     .replace(/javascript:/gi,'')
+     .replace(/<\s*(iframe|object|embed|link|meta)\b[^>]*>/gi,'');
+  if(!/^<svg[\s>]/i.test(s.trim()))return '';
+  return s;
+}
+function svgSize(svg){
+  const m=/viewBox\s*=\s*["']\s*[\d.-]+\s+[\d.-]+\s+([\d.]+)\s+([\d.]+)/i.exec(svg||'');
+  return m?{w:+m[1],h:+m[2]}:{w:1000,h:1000};
+}
+
+/* ---- المراجع البصرية ---- */
+async function dgAddRefs(list){
+  for(const f of Array.from(list||[])){
+    if(DG_REFS.length>=5){ toast('⚠️ الحد ٥ مراجع.','err'); break; }
+    if(!/^image\//.test(f.type||'')){ toast('⚠️ «'+esc(f.name)+'» ليس صورة.','err'); continue; }
+    try{
+      const small=await lgCompress(f);
+      DG_REFS.push({name:f.name,kind:'image',media_type:small.type||f.type,data:await lgToB64(small),url:URL.createObjectURL(small)});
+    }catch(_){ toast('⚠️ تعذّرت قراءة «'+esc(f.name)+'».','err'); }
+  }
+  dgRenderRefs(); document.getElementById('dg-files').value='';
+}
+function dgRenderRefs(){
+  document.getElementById('dg-refs').innerHTML=DG_REFS.map((r,i)=>
+    '<div style="position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;border:1px solid var(--line)">'
+    +'<img src="'+r.url+'" style="width:100%;height:100%;object-fit:cover">'
+    +'<button type="button" onclick="dgDelRef('+i+')" style="position:absolute;top:2px;inset-inline-end:2px;background:rgba(0,0,0,.7);'
+    +'color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:1">×</button></div>').join('');
+}
+function dgDelRef(i){ if(DG_REFS[i]&&DG_REFS[i].url)URL.revokeObjectURL(DG_REFS[i].url); DG_REFS.splice(i,1); dgRenderRefs(); }
+
+/* ---- التوليد والتطوير ---- */
+async function dgRun(evolve,forced){
+  const req=forced||document.getElementById('dg-req').value.trim();
+  if(!req&&!evolve)return toast('⚠️ اكتب ما تريد تصميمه.','err');
+  if(evolve&&!DG_CUR)return toast('⚠️ لا توجد نسخة لتطويرها — صمّم أولًا.','err');
+  const out=document.getElementById('dg-out');
+  out.innerHTML='<div class="card" style="text-align:center;padding:30px"><div style="font-size:30px">🪄</div>'
+    +'<div style="margin-top:10px;font-size:14px">'+(evolve?'جارٍ تطوير النسخة الحالية...':'جارٍ التصميم...')+'</div>'
+    +'<div style="margin-top:6px;font-size:12.5px;color:var(--muted)">يرسم ويوازن العناصر — دقيقة إلى دقيقتين.</div></div>';
+  try{
+    if(!auth||!auth.currentUser)throw new Error('سجّل دخولك في اللوحة أولًا.');
+    const token=await auth.currentUser.getIdToken();
+    const res=await fetch(aiUrl(),{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({
+        mode:'design',
+        prompt:req||'طوّر النسخة الحالية وحسّن توازنها وقابلية قراءتها.',
+        canvas:document.getElementById('dg-canvas').value,
+        files:DG_REFS.map(r=>({name:r.name,kind:'image',media_type:r.media_type,data:r.data})),
+        prevSvg:evolve&&DG_CUR?DG_CUR.svg:''
+      })
+    });
+    const o=await res.json().catch(()=>({error:'رد غير مفهوم (HTTP '+res.status+')'}));
+    if(!res.ok||o.error)throw new Error(o.error||('HTTP '+res.status));
+    const d=o.design||{};
+    d.svg=svgClean(d.svg);
+    if(!d.svg)throw new Error('لم يُرجع النموذج تصميمًا صالحًا. أعد المحاولة.');
+    d.req=req; d.at=new Date().toISOString(); d.id='d'+uid();
+    DG_CUR=d; dgSave(d); dgShow(d);
+    if(o.truncated)toast('⚠️ التصميم طويل واقتُطع — بسّط الطلب.','err');
+  }catch(e){
+    out.innerHTML='<div class="card" style="border-color:var(--expense)">⚠️ '+esc(e.message)+'</div>';
+  }
+}
+function dgCritique(){
+  dgRun(true,'انقد النسخة الحالية نقدًا صريحًا كمصمم محترف: أين الخلل في التسلسل البصري أو التباين أو المسافات أو قابلية القراءة من بعيد؟ ثم أصلح كل خلل وجدته وأعد النسخة المحسّنة، مع ذكر ما أصلحته في القرارات.');
+}
+function dgApply(txt){
+  document.getElementById('dg-req').value=txt;
+  dgRun(true,txt);
+  window.scrollTo({top:document.getElementById('dg-out').offsetTop-80,behavior:'smooth'});
+}
+
+/* ---- العرض ---- */
+function dgShow(d){
+  const sz=svgSize(d.svg);
+  let h='<div class="card" style="border-color:var(--brand)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
+    +'<div><b style="font-size:16px">'+esc(d.title||'تصميم')+'</b>'
+    +'<div style="font-size:12.5px;color:var(--muted);margin-top:3px">'+esc(d.concept||'')+'</div></div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +'<button class="btn ghost sm" type="button" onclick="dgDownload(\'svg\')">⬇️ SVG</button>'
+    +'<button class="btn ghost sm" type="button" onclick="dgDownload(\'png\')">⬇️ PNG</button>'
+    +'<button class="btn ghost sm" type="button" onclick="dgPrint()">🖨️</button></div></div>'
+    +'<div id="dg-canvas-box" style="background:#fff;border-radius:10px;padding:10px;overflow-x:auto">'
+    +'<div style="min-width:280px;max-width:100%;margin:auto">'+d.svg+'</div></div>'
+    +'<div style="font-size:11.5px;color:var(--muted);margin-top:8px">المقاس: '+fmt(sz.w)+' × '+fmt(sz.h)+' — متجهي يُكبَّر بلا حدود</div>';
+
+  if((d.palette||[]).length){
+    h+='<div style="margin-top:16px"><div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">لوحة الألوان</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    d.palette.forEach(p=>h+='<div style="text-align:center"><div style="width:52px;height:52px;border-radius:9px;border:1px solid var(--line);background:'+esc(p.hex)+'"></div>'
+      +'<div style="font-size:10.5px;color:var(--muted);margin-top:4px">'+esc(p.role)+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);font-family:monospace">'+esc(p.hex)+'</div></div>');
+    h+='</div></div>';
+  }
+  if((d.decisions||[]).length){
+    h+='<div style="margin-top:16px"><div style="font-size:12.5px;color:var(--muted);margin-bottom:6px">قرارات التصميم</div>';
+    d.decisions.forEach(x=>h+='<div style="font-size:13px;line-height:1.9;margin:4px 0">• '+esc(x)+'</div>');
+    h+='</div>';
+  }
+  if((d.improvements||[]).length){
+    h+='<div style="margin-top:18px;background:var(--panel2);border-radius:10px;padding:14px">'
+      +'<div style="font-size:13px;color:var(--brand);margin-bottom:10px"><b>💡 خطوات تطوير مقترحة</b> — اضغط أيها لتنفيذه فورًا</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    d.improvements.forEach(x=>h+='<button class="btn ghost sm" type="button" style="text-align:start;white-space:normal;max-width:100%" '
+      +'onclick="dgApply(\''+esc(x).replace(/'/g,"\\'")+'\')">'+esc(x)+'</button>');
+    h+='</div></div>';
+  }
+  h+='</div>';
+  document.getElementById('dg-out').innerHTML=h;
+  document.getElementById('dg-evolve').style.display='';
+  document.getElementById('dg-crit').style.display='';
+}
+
+/* ---- سجل النسخ ---- */
+function dgSave(d){
+  const arr=DB.get('dg');
+  arr.push({id:d.id,title:d.title,req:d.req,at:d.at,svg:d.svg,
+    concept:d.concept,palette:d.palette,decisions:d.decisions,improvements:d.improvements});
+  while(arr.length>40)arr.shift();                 /* أبقِ آخر ٤٠ نسخة */
+  DB.set('dg',arr); dgHistory();
+  if(lgCloudOn()&&d.svg.length<800000){
+    fdb.collection('designs').doc(d.id).set({
+      title:d.title||'',req:d.req||'',at:d.at,svg:d.svg,
+      by:(auth.currentUser&&auth.currentUser.email)||''
+    }).catch(()=>{});
+  }
+}
+function dgHistory(){
+  const arr=DB.get('dg').slice().reverse(), el=document.getElementById('dg-hist');
+  document.getElementById('dg-hist-title').style.display=arr.length?'':'none';
+  el.innerHTML=arr.map((d,i)=>
+    '<div class="card" style="padding:10px;cursor:pointer" onclick="dgLoad(\''+d.id+'\')">'
+    +'<div style="background:#fff;border-radius:8px;height:110px;display:grid;place-items:center;overflow:hidden">'
+    +'<div style="width:100%;height:100%;display:grid;place-items:center">'+d.svg+'</div></div>'
+    +'<div style="font-size:12.5px;margin-top:8px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+    +'#'+(arr.length-i)+' '+esc(d.title||'تصميم')+'</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc((d.at||'').slice(0,10))+'</div>'
+    +'<div style="display:flex;gap:5px;margin-top:8px">'
+    +'<button class="btn ghost sm" type="button" onclick="event.stopPropagation();dgLoad(\''+d.id+'\')">فتح</button>'
+    +'<button class="btn danger sm" type="button" onclick="event.stopPropagation();dgDel(\''+d.id+'\')">حذف</button></div></div>').join('');
+  /* اضبط أحجام المصغّرات */
+  el.querySelectorAll('svg').forEach(s=>{ s.removeAttribute('width'); s.removeAttribute('height');
+    s.style.maxWidth='100%'; s.style.maxHeight='110px'; });
+}
+function dgLoad(id){
+  const d=DB.get('dg').find(x=>x.id===id); if(!d)return;
+  DG_CUR=d; dgShow(d);
+  window.scrollTo({top:document.getElementById('dg-out').offsetTop-80,behavior:'smooth'});
+  toast('📂 فُتحت النسخة — اضغط «طوّر» للبناء عليها.','ok');
+}
+function dgDel(id){
+  if(!confirm('حذف هذه النسخة؟'))return;
+  DB.set('dg',DB.get('dg').filter(x=>x.id!==id));
+  if(lgCloudOn())fdb.collection('designs').doc(id).delete().catch(()=>{});
+  if(DG_CUR&&DG_CUR.id===id){ DG_CUR=null; document.getElementById('dg-out').innerHTML='';
+    document.getElementById('dg-evolve').style.display='none'; document.getElementById('dg-crit').style.display='none'; }
+  dgHistory();
+}
+
+/* ---- التصدير ---- */
+function dgDownload(kind){
+  if(!DG_CUR)return;
+  const name=(DG_CUR.title||'تصميم').replace(/[\\/:*?"<>|]/g,'-');
+  if(kind==='svg'){
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([DG_CUR.svg],{type:'image/svg+xml;charset=utf-8'}));
+    a.download=name+'.svg'; a.click();
+    return toast('⬇️ نُزّل SVG — افتحه في Illustrator أو أرسله للمطبعة.','ok');
+  }
+  const sz=svgSize(DG_CUR.svg), scale=Math.min(4,Math.max(1,2400/Math.max(sz.w,sz.h)));
+  const img=new Image();
+  const url=URL.createObjectURL(new Blob([DG_CUR.svg],{type:'image/svg+xml;charset=utf-8'}));
+  img.onload=()=>{
+    const cv=document.createElement('canvas');
+    cv.width=Math.round(sz.w*scale); cv.height=Math.round(sz.h*scale);
+    const cx=cv.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,cv.width,cv.height);
+    cx.drawImage(img,0,0,cv.width,cv.height);
+    URL.revokeObjectURL(url);
+    cv.toBlob(b=>{ const a=document.createElement('a');
+      a.href=URL.createObjectURL(b); a.download=name+'.png'; a.click();
+      toast('⬇️ نُزّل PNG بدقة '+cv.width+'×'+cv.height+'.','ok'); },'image/png');
+  };
+  img.onerror=()=>{ URL.revokeObjectURL(url); toast('⚠️ تعذّر تحويل PNG — نزّل SVG بدلًا منه.','err'); };
+  img.src=url;
+}
+function dgPrint(){
+  if(!DG_CUR)return;
+  const w=window.open('','_blank');
+  w.document.write('<html dir="rtl"><head><meta charset="utf-8"><title>'+esc(DG_CUR.title||'تصميم')+'</title>'
+    +'<style>body{margin:0;display:grid;place-items:center;min-height:100vh;background:#fff}svg{max-width:100%;height:auto}@page{margin:8mm}</style>'
+    +'</head><body>'+DG_CUR.svg+'</body></html>');
+  w.document.close(); setTimeout(()=>w.print(),400);
+}
+
+function dgHelp(){
+  const row=(ic,t,d)=>'<div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)">'
+    +'<div style="font-size:20px;width:34px;flex-shrink:0;text-align:center">'+ic+'</div>'
+    +'<div><b>'+t+'</b><br><span style="color:var(--muted);font-size:12.5px">'+d+'</span></div></div>';
+  dlg('❓ كيف يعمل استوديو التصميم',
+    '<p style="margin:0 0 14px">يولّد تصاميم <b>متجهية (SVG)</b> — تُكبَّر لحجم جانب باص كامل بلا تشويش، وتُسلَّم للمطبعة مباشرة.</p>'
+    +row('🪄','صمّم','يبدأ تصميمًا جديدًا من وصفك. كلما كان وصفك أدقّ (ألوان، نصوص، طابع) كانت النتيجة أقرب لمرادك.')
+    +row('🔁','طوّر النسخة الحالية','يبني على ما هو معروض ولا يبدأ من الصفر — يحتفظ بالهوية والألوان وما أعجبك، ويطبّق تعديلك فقط. اكتب التعديل في الحقل الأول ثم اضغطه.')
+    +row('🔍','انقد وحسّن','ينقد تصميمه بنفسه كمصمم محترف — التباين، التسلسل البصري، المسافات، القراءة من بعيد — ثم يصلح ما وجده ويعرض نسخة محسّنة.')
+    +row('💡','خطوات التطوير','بعد كل تصميم يقترح تحسينات محددة. اضغط أيها فيُنفَّذ فورًا كنسخة جديدة.')
+    +row('🖼️','المراجع البصرية','ارفع صورة سيارتك أو شعارك — يراها ويستلهم منها الألوان والنسب ويصمم على مقاسها.')
+    +row('📚','سجل النسخ','كل تصميم يُحفظ تلقائيًا في نفس الصفحة. اضغط أي نسخة لفتحها والبناء عليها — لا تضيع نسخة أبدًا.')
+    +row('⬇️','التصدير','<b>SVG</b> للمطابع وبرامج التصميم (الأفضل للمركبات). <b>PNG</b> عالي الدقة للواتساب والعرض السريع.')
+    +'<div style="margin-top:16px;background:var(--panel2);border-radius:10px;padding:12px;font-size:12.5px;line-height:1.9">'
+    +'<b style="color:var(--brand)">لماذا متجهي وليس صورة؟</b><br>'
+    +'ملصق جانب الباص طوله ١٢ مترًا. الصورة العادية تتشوّه عند هذا التكبير، أمّا المتجهي فيبقى حادًّا عند أي مقاس — '
+    +'ولهذا كل مطابع الفينيل تطلب ملفات متجهية.</div>');
+}
+
 /* ================= دفتر المستودع (المحاسب) ================= */
 const LG_CORE=[
   {k:'debit', t:'مدين',        num:true,  hint:'المبلغ الوارد إليك'},
@@ -2575,7 +2866,7 @@ document.getElementById('st-feas').style.display='none';
 document.getElementById('st-anal').style.display='none';
 document.getElementById('st-gen').style.display='none';
 FEAS=feasLoad();renderFeas();renderReqList();
-renderMk();renderBz();renderAcc();renderLedger();renderRs();renderReq();renderPeaks();initDesign();renderAgenda();newLetter();renderSecretary();renderHome();initAuth();
+renderMk();renderBz();renderAcc();renderLedger();dgHistory();renderRs();renderReq();renderPeaks();initDesign();renderAgenda();newLetter();renderSecretary();renderHome();initAuth();
 </script>
 </body>
 </html>

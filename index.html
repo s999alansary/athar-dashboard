@@ -849,7 +849,8 @@ let SYNC_READY=false;
 function syncAt(k){ return Number(localStorage.getItem('at_'+k)||0); }
 function syncBadge(state){
   const b=document.getElementById('sync-pill'); if(!b)return;
-  const m={busy:['y','⏳ مزامنة...'],ok:['g','☁️ متزامن'],err:['y','⚠️ محلي فقط'],off:['y','☁️ غير متصل']};
+  const m={busy:['y','⏳ مزامنة...'],ok:['g','☁️ متزامن'],live:['g','🔄 مباشر'],
+           err:['y','⚠️ محلي فقط'],off:['y','☁️ غير متصل']};
   const s=m[state]||m.off; b.className='pill '+s[0]; b.textContent=s[1];
 }
 function syncOn(){ return !!(fdb&&auth&&auth.currentUser); }
@@ -909,6 +910,44 @@ async function syncPull(loud){
   }
   return changed;
 }
+
+/* ===== الاستماع الحيّ: أي تعديل من أي جهاز يصل فورًا ===== */
+let SYNC_UNSUB=null,_refreshT=null;
+
+/* لا تُعِد الرسم والمستخدم يكتب — أجّل حتى ينتهي */
+function syncSafeRefresh(){
+  const a=document.activeElement;
+  const busy=a&&(a.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName||''));
+  clearTimeout(_refreshT);
+  if(busy){ _refreshT=setTimeout(syncSafeRefresh,1500); return; }
+  refreshAll();
+}
+
+function syncLive(){
+  if(!syncOn())return;
+  if(SYNC_UNSUB){ try{SYNC_UNSUB();}catch(_){} SYNC_UNSUB=null; }
+  SYNC_UNSUB=fdb.collection('sync').onSnapshot(snap=>{
+    let hit=0;
+    snap.docChanges().forEach(ch=>{
+      if(ch.type==='removed')return;
+      if(ch.doc.metadata.hasPendingWrites)return;      /* صدى كتابتنا نحن */
+      const k=ch.doc.id;
+      if(SYNC_KEYS.indexOf(k)<0)return;
+      const o=ch.doc.data();
+      if(!o||typeof o.v!=='string')return;
+      if(Number(o.at||0)<=syncAt(k))return;            /* عندنا الأحدث */
+      localStorage.setItem(k,o.v);
+      localStorage.setItem('at_'+k,String(o.at));
+      hit++;
+    });
+    syncBadge('live');
+    if(hit){
+      syncSafeRefresh();
+      toast('🔄 وصل تحديث من جهاز آخر.','ok');
+    }
+  },()=>syncBadge('err'));
+}
+function syncStop(){ if(SYNC_UNSUB){ try{SYNC_UNSUB();}catch(_){} SYNC_UNSUB=null; } }
 
 /* يرفع كل ما هو محلي إلى السحابة (أول مرة أو بعد انقطاع) */
 async function syncPushAll(){
@@ -3030,9 +3069,10 @@ function initAuth(){
       let role='employee';
       try{ role=await loadRole(email); }catch(e){}
       CUR.role=role; applyAccess();
-      syncPull(false);                    /* اسحب أحدث البيانات من السحابة */
+      syncPull(false).then(()=>syncLive());   /* اسحب ثم استمع للتحديثات لحظيًا */
     }else{
       CUR=null;
+      syncStop(); SYNC_READY=false; syncBadge('off');
       document.getElementById('sess-box').style.display='none';
       document.getElementById('login-ov').style.display='grid';
     }

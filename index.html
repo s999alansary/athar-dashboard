@@ -267,6 +267,7 @@
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               <button class="btn" type="button" onclick="lgAddRow()" title="إضافة صف جديد">＋ صف</button>
               <button class="btn ghost sm" type="button" onclick="lgColDialog()" title="إضافة عمود جديد">🧩 عمود</button>
+              <button class="btn ghost sm" type="button" onclick="lgSyncCloud()" title="رفع المرفقات المحلية إلى السحابة">☁️ مزامنة</button>
               <button class="btn ghost sm" type="button" onclick="lgPrint()" title="طباعة">🖨️</button>
               <button class="btn ghost sm" type="button" onclick="lgCsv()" title="تصدير Excel/CSV">⬇️</button>
               <button class="btn ghost sm" type="button" onclick="lgHelp()" title="شرح الأدوات">❓</button>
@@ -652,6 +653,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <!-- Google Identity Services (تقويم Google) -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <!-- قراءة الملفات المرفقة: Excel · PDF · Word -->
@@ -662,11 +664,12 @@
 <script>
 /* ---- Firebase init ---- */
 const firebaseConfig={apiKey:"AIzaSyAOD5VhRc6s4eZHyeOKMiWDYYJG6dVYBlE",authDomain:"athar-dashboard.firebaseapp.com",projectId:"athar-dashboard",storageBucket:"athar-dashboard.firebasestorage.app",messagingSenderId:"509007437620",appId:"1:509007437620:web:391363cc87ab9f47488f61"};
-let auth=null, fdb=null;
+let auth=null, fdb=null, fst=null;
 try{
   if(typeof firebase==='undefined')throw new Error('لم تُحمّل مكتبة Firebase (تأكّد من اتصال الإنترنت)');
   firebase.initializeApp(firebaseConfig);
   auth=firebase.auth(); fdb=firebase.firestore();
+  try{ fst=firebase.storage(); }catch(_){ fst=null; }
 }catch(e){
   (window.__showErr||function(m){alert(m);})('⚠️ تعذّر الاتصال بـ Firebase: '+(e&&e.message||e)+'. حدّث الصفحة (Ctrl+Shift+R).');
 }
@@ -1564,6 +1567,86 @@ const LDB={
 };
 const LG_ATT_MAXMB=15;
 
+function lgCloudOn(){ return !!(fdb&&auth&&auth.currentUser); }
+
+/* ---- ضغط الصور قبل الرفع ---- */
+const LG_IMG_MAXPX=1600, LG_IMG_Q=0.75;
+function lgCompress(file){
+  return new Promise(res=>{
+    if(!/^image\//.test(file.type||'')||/gif|svg/i.test(file.type))return res(file);
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const s=Math.min(1,LG_IMG_MAXPX/Math.max(img.width,img.height));
+      const w=Math.round(img.width*s), h=Math.round(img.height*s);
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      cv.toBlob(b=>{
+        if(!b||b.size>=file.size)return res(file);           /* لا تكبّر الملف */
+        b.name=file.name.replace(/\.[^.]+$/,'')+'.jpg';
+        res(b);
+      },'image/jpeg',LG_IMG_Q);
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); res(file); };
+    img.src=url;
+  });
+}
+function lgToB64(blob){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(String(r.result).split(',')[1]);
+    r.onerror=()=>rej(new Error('تعذّرت قراءة الملف'));
+    r.readAsDataURL(blob);
+  });
+}
+
+/* ---- تخزين المرفقات في Firestore (مجاني على خطة Spark) ---- */
+const LG_CHUNK=500000;                 /* حد المستند 1 ميجا — نبقى دونه بأمان */
+const LG_FS_MAXMB=5;
+const LG_CACHE={};
+
+async function lgFsUpload(attId,blob,name,type){
+  const b64=await lgToB64(blob);
+  const parts=[];
+  for(let i=0;i<b64.length;i+=LG_CHUNK)parts.push(b64.slice(i,i+LG_CHUNK));
+  const batch=fdb.batch();
+  parts.forEach((p,i)=>batch.set(fdb.collection('att_chunks').doc(attId+'_'+i),{d:p}));
+  batch.set(fdb.collection('att').doc(attId),{
+    name,type:type||'',size:blob.size,chunks:parts.length,
+    by:(auth.currentUser&&auth.currentUser.email)||'',
+    at:new Date().toISOString()
+  });
+  await batch.commit();
+}
+async function lgFsFetch(attId){
+  if(LG_CACHE[attId])return LG_CACHE[attId];
+  const meta=await fdb.collection('att').doc(attId).get();
+  if(!meta.exists)throw new Error('المرفق غير موجود في السحابة');
+  const m=meta.data();
+  let b64='';
+  for(let i=0;i<m.chunks;i++){
+    const c=await fdb.collection('att_chunks').doc(attId+'_'+i).get();
+    if(!c.exists)throw new Error('المرفق ناقص — أعد رفعه');
+    b64+=c.data().d;
+  }
+  const bin=atob(b64), u8=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+  const rec={name:m.name,type:m.type,size:m.size,blob:new Blob([u8],{type:m.type||'application/octet-stream'})};
+  LG_CACHE[attId]=rec;
+  return rec;
+}
+async function lgFsDelete(attId){
+  try{
+    const meta=await fdb.collection('att').doc(attId).get();
+    const n=meta.exists?(meta.data().chunks||0):0;
+    const batch=fdb.batch();
+    for(let i=0;i<n;i++)batch.delete(fdb.collection('att_chunks').doc(attId+'_'+i));
+    batch.delete(fdb.collection('att').doc(attId));
+    await batch.commit();
+  }catch(_){}
+  delete LG_CACHE[attId];
+}
+
 function lgAttachPick(rowId){
   const inp=document.createElement('input');
   inp.type='file';
@@ -1571,25 +1654,88 @@ function lgAttachPick(rowId){
   inp.onchange=async()=>{
     const f=inp.files&&inp.files[0]; if(!f)return;
     if(f.size>LG_ATT_MAXMB*1024*1024)return toast('⚠️ الملف أكبر من '+LG_ATT_MAXMB+' ميجابايت.','err');
+    const arr=DB.get('lg'), r=arr.find(x=>x.id===rowId); if(!r)return;
+    await lgAttachWipe(r);                       /* أزل المرفق السابق إن وُجد */
+    const attId='a'+uid();
+
+    /* اضغط الصور — يوفّر مساحة السحابة دون فقد وضوح الفاتورة */
+    const isImg=/^image\//.test(f.type||'');
+    const blob=await lgCompress(f);
+    if(isImg&&blob!==f)toast('🗜️ ضُغطت الصورة من '+fmt(Math.round(f.size/1024))+' إلى '+fmt(Math.round(blob.size/1024))+' كيلوبايت.');
+
+    /* المسار الأول: السحابة — يراه كل الموظفين وكل الأجهزة */
+    if(lgCloudOn()&&blob.size<=LG_FS_MAXMB*1024*1024){
+      toast('☁️ جارٍ الرفع للسحابة...');
+      try{
+        await lgFsUpload(attId,blob,f.name,blob.type||f.type||'');
+        r.attId=attId; r.attFs=true; r.attCloud=true;
+        r.attName=f.name; r.attType=blob.type||f.type||''; r.attSize=blob.size;
+        DB.set('lg',arr); renderLedger();
+        return toast('☁️ رُفع «'+esc(f.name)+'» — متاح على كل الأجهزة.','ok');
+      }catch(e){
+        const m=String((e&&e.code)||(e&&e.message)||e);
+        if(/permission|insufficient/i.test(m))
+          toast('⚠️ قواعد Firestore تمنع الرفع — راجع الإعداد. حُفظ محليًا مؤقتًا.','err');
+        else toast('⚠️ تعذّر الرفع ('+esc(m)+'). حُفظ محليًا مؤقتًا.','err');
+      }
+    }else if(lgCloudOn()){
+      toast('⚠️ الملف أكبر من '+LG_FS_MAXMB+' ميجا للرفع السحابي — حُفظ محليًا.','err');
+    }
+
+    /* المسار البديل: هذا الجهاز فقط */
     try{
-      const arr=DB.get('lg'), r=arr.find(x=>x.id===rowId); if(!r)return;
-      if(r.attId)await LDB.del(r.attId).catch(()=>{});
-      const attId='a'+uid();
-      await LDB.put({id:attId,name:f.name,type:f.type||'',size:f.size,blob:f});
-      r.attId=attId; r.attName=f.name; r.attType=f.type||''; r.attSize=f.size;
+      await LDB.put({id:attId,name:f.name,type:blob.type||f.type||'',size:blob.size,blob});
+      r.attId=attId; r.attFs=false; r.attCloud=false;
+      r.attName=f.name; r.attType=blob.type||f.type||''; r.attSize=blob.size;
       DB.set('lg',arr); renderLedger();
-      toast('📎 أُرفق «'+esc(f.name)+'».','ok');
+      toast('💾 حُفظ «'+esc(f.name)+'» على هذا الجهاز فقط.','ok');
     }catch(e){ toast('⚠️ تعذّر حفظ المرفق: '+esc(e.message||e),'err'); }
   };
   inp.click();
 }
+
+/* يمسح المرفق من مصدره (سحابة أو محلي) دون تغيير الصف */
+async function lgAttachWipe(r){
+  if(!r.attId)return;
+  if(r.attFs)await lgFsDelete(r.attId);
+  else await LDB.del(r.attId).catch(()=>{});
+}
+
+/* رفع كل المرفقات المحلية القديمة إلى السحابة */
+async function lgSyncCloud(){
+  if(!lgCloudOn())return toast('⚠️ سجّل دخولك في اللوحة أولًا.','err');
+  const arr=DB.get('lg'), locals=arr.filter(r=>r.attId&&!r.attFs);
+  if(!locals.length)return toast('✅ لا توجد مرفقات محلية — كل شيء في السحابة.','ok');
+  toast('☁️ جارٍ رفع '+locals.length+' مرفقًا...');
+  let ok=0,fail=0;
+  for(const r of locals){
+    try{
+      const rec=await LDB.get(r.attId); if(!rec){fail++;continue;}
+      const blob=await lgCompress(rec.blob.type?rec.blob:new Blob([rec.blob],{type:rec.type||''}));
+      if(blob.size>LG_FS_MAXMB*1024*1024){fail++;continue;}
+      await lgFsUpload(r.attId,blob,rec.name,blob.type||rec.type||'');
+      await LDB.del(r.attId).catch(()=>{});
+      r.attFs=true; r.attCloud=true; r.attSize=blob.size;
+      ok++;
+    }catch(_){ fail++; }
+  }
+  DB.set('lg',arr); renderLedger();
+  toast(ok?('☁️ رُفع '+ok+' مرفقًا'+(fail?(' — وتعذّر '+fail):'')+'.'):('⚠️ تعذّر رفع '+fail+' مرفقًا.'),ok?'ok':'err');
+}
 async function lgAttachView(rowId){
   const r=DB.get('lg').find(x=>x.id===rowId); if(!r||!r.attId)return;
   try{
-    const rec=await LDB.get(r.attId);
-    if(!rec)return toast('⚠️ المرفق غير موجود — ربما حُذف من هذا الجهاز.','err');
-    const url=URL.createObjectURL(rec.blob);
+    let rec;
+    if(r.attFs){ toast('☁️ جارٍ الجلب من السحابة...'); rec=await lgFsFetch(r.attId); }
+    else{
+      rec=await LDB.get(r.attId);
+      if(!rec)return toast('⚠️ المرفق غير موجود — ربما حُذف من هذا الجهاز.','err');
+    }
+    const url=URL.createObjectURL(rec.blob), revoke=()=>URL.revokeObjectURL(url);
     const isImg=/^image\//.test(rec.type||'');
+    const where=r.attCloud
+      ? '<span style="color:var(--brand)">☁️ محفوظ في السحابة — يظهر على كل الأجهزة</span>'
+      : '<span style="color:var(--warn)">💾 محفوظ على هذا الجهاز فقط</span>';
     const body=(isImg
         ? '<img src="'+url+'" alt="'+esc(rec.name)+'" style="max-width:100%;border-radius:10px;display:block">'
         : '<div style="text-align:center;padding:22px 0"><div style="font-size:42px">📄</div>'
@@ -1598,15 +1744,16 @@ async function lgAttachView(rowId){
       +'<a class="btn ghost sm" href="'+url+'" target="_blank" rel="noopener">↗️ فتح في تبويب</a>'
       +'<a class="btn ghost sm" href="'+url+'" download="'+esc(rec.name)+'">⬇️ تنزيل</a>'
       +'<button class="btn danger sm" type="button" onclick="lgAttachDel(\''+rowId+'\')">🗑️ إزالة المرفق</button></div>'
-      +'<div style="margin-top:10px;font-size:12px;color:var(--muted)">الحجم: '+fmt(Math.round((rec.size||0)/1024))+' كيلوبايت</div>';
-    dlg('📎 '+esc(rec.name),body,null,null,()=>URL.revokeObjectURL(url));
+      +'<div style="margin-top:10px;font-size:12px;color:var(--muted);line-height:1.9">الحجم: '+fmt(Math.round((rec.size||0)/1024))+' كيلوبايت<br>'+where+'</div>';
+    dlg('📎 '+esc(rec.name),body,null,null,revoke);
   }catch(e){ toast('⚠️ تعذّر فتح المرفق: '+esc(e.message||e),'err'); }
 }
 async function lgAttachDel(rowId){
   const arr=DB.get('lg'), r=arr.find(x=>x.id===rowId); if(!r||!r.attId)return;
   if(!confirm('إزالة المرفق من هذا القيد؟'))return;
-  await LDB.del(r.attId).catch(()=>{});
-  delete r.attId; delete r.attName; delete r.attType; delete r.attSize;
+  await lgAttachWipe(r);
+  delete r.attId; delete r.attFs; delete r.attCloud;
+  delete r.attName; delete r.attType; delete r.attSize;
   DB.set('lg',arr); renderLedger();
   document.querySelectorAll('[data-dlg]').forEach(x=>x.remove());
   toast('🗑️ أُزيل المرفق.','ok');
@@ -1648,7 +1795,7 @@ function renderLedger(){
     });
     h+='<td style="white-space:nowrap">'+(r.attId
       ? '<button class="btn ghost sm" type="button" onclick="lgAttachView(\''+r.id+'\')" title="'+esc(r.attName||'')+'">'
-        +(/^image\//.test(r.attType||'')?'🖼️':'📄')+' عرض</button>'
+        +(r.attCloud?'☁️':'💾')+' '+(/^image\//.test(r.attType||'')?'🖼️':'📄')+'</button>'
       : '<button class="btn ghost sm" type="button" onclick="lgAttachPick(\''+r.id+'\')" title="إرفاق ملف">📎 إرفاق</button>')
       +'</td>';
     extra.forEach(c=>{
@@ -1684,7 +1831,7 @@ function lgAddRow(){
 function lgDelRow(id){
   if(!confirm('حذف هذا القيد؟'))return;
   const r=DB.get('lg').find(x=>x.id===id);
-  if(r&&r.attId)LDB.del(r.attId).catch(()=>{});
+  if(r)lgAttachWipe(r).catch(()=>{});
   DB.set('lg',DB.get('lg').filter(x=>x.id!==id)); renderLedger();
 }
 function lgEdit(td){
@@ -1768,7 +1915,9 @@ function lgHelp(){
     +row('🧩','إضافة عمود جديد','لتسجيل معلومة إضافية غير موجودة — مثل اسم المورّد أو طريقة الدفع.')
     +row('🖨️','طباعة / PDF','يفتح نسخة بيضاء منسّقة للطباعة أو الحفظ كـ PDF.')
     +row('⬇️','تصدير Excel','ينزّل الجدول بصيغة CSV تفتحها بـ Excel مباشرة بترميز عربي سليم.')
-    +row('📎','إرفاق فاتورة','في عمود «المرفق» اضغط «📎 إرفاق» واختر أي ملف أو صورة — بلا قيود على النوع. بعدها يتحول الزر إلى «عرض» لفتح المرفق أو تنزيله أو إزالته. الملفات تُحفظ داخل متصفح هذا الجهاز (حتى ١٥ ميجابايت للملف).')
+    +row('📎','إرفاق فاتورة','اضغط «📎 إرفاق» واختر أي ملف أو صورة. الصور تُضغط تلقائيًا (بلا فقد وضوح) ثم تُرفع للسحابة، فيراها كل الموظفين على كل الأجهزة. الحد للرفع السحابي ٥ ميجابايت بعد الضغط.')
+    +row('☁️ / 💾','أين حُفظ المرفق؟','<b style="color:var(--brand)">☁️</b> يعني في السحابة ومتاح للجميع. <b style="color:var(--warn)">💾</b> يعني على هذا الجهاز فقط (يحدث إن تعذّر الرفع) — اضغط «☁️ مزامنة» لنقله للسحابة.')
+    +row('☁️ مزامنة','رفع المتأخر','يبحث عن كل مرفق محفوظ محليًا ويرفعه للسحابة دفعة واحدة.')
     +row('✏️','التعديل المباشر','اضغط أي خانة واكتب فيها — تُحفظ فور خروجك منها. زر Enter ينهي التعديل.')
     +row('🗑️','حذف','زر «حذف» في آخر كل صف يمسح القيد، و«×» في رأس العمود يمسح العمود.')
     +'<div style="margin-top:16px;background:var(--panel2);border-radius:10px;padding:12px;font-size:12.5px;line-height:1.9">'

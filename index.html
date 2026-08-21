@@ -1657,29 +1657,25 @@ async function dgRun(evolve,forced){
   const out=document.getElementById('dg-out');
   out.innerHTML='<div class="card" style="text-align:center;padding:30px"><div style="font-size:30px">🪄</div>'
     +'<div style="margin-top:10px;font-size:14px">'+(evolve?'جارٍ تطوير النسخة الحالية...':'جارٍ التصميم...')+'</div>'
-    +'<div style="margin-top:6px;font-size:12.5px;color:var(--muted)">يرسم ويوازن العناصر — دقيقة إلى دقيقتين.</div></div>';
+    +'<div id="dg-prog" style="margin-top:6px;font-size:12.5px;color:var(--muted)">يفكّر في التكوين...</div></div>';
   try{
-    if(!auth||!auth.currentUser)throw new Error('سجّل دخولك في اللوحة أولًا.');
-    const token=await auth.currentUser.getIdToken();
-    const res=await fetch(aiUrl(),{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body:JSON.stringify({
-        mode:'design',
-        prompt:req||'طوّر النسخة الحالية وحسّن توازنها وقابلية قراءتها.',
-        canvas:document.getElementById('dg-canvas').value,
-        files:DG_REFS.map(r=>({name:r.name,kind:'image',media_type:r.media_type,data:r.data})),
-        prevSvg:evolve&&DG_CUR?DG_CUR.svg:''
-      })
+    const r=await aiSend({
+      mode:'design',
+      prompt:req||'طوّر النسخة الحالية وحسّن توازنها وقابلية قراءتها.',
+      canvas:document.getElementById('dg-canvas').value,
+      files:DG_REFS.map(x=>({name:x.name,kind:'image',media_type:x.media_type,data:x.data})),
+      prevSvg:evolve&&DG_CUR?DG_CUR.svg:''
+    },(n,th)=>{
+      const p=document.getElementById('dg-prog');
+      if(p)p.textContent=th?'يفكّر في التكوين...':('يرسم... '+fmt(n)+' حرفًا');
     });
-    const o=await res.json().catch(()=>({error:'رد غير مفهوم (HTTP '+res.status+')'}));
-    if(!res.ok||o.error)throw new Error(o.error||('HTTP '+res.status));
-    const d=o.design||{};
+    let o; try{ o=JSON.parse(r.text); }catch(_){ throw new Error('تعذّر تفسير مخرجات التصميم. أعد المحاولة.'); }
+    const d=o||{};
     d.svg=svgClean(d.svg);
     if(!d.svg)throw new Error('لم يُرجع النموذج تصميمًا صالحًا. أعد المحاولة.');
     d.req=req; d.at=new Date().toISOString(); d.id='d'+uid();
     DG_CUR=d; dgSave(d); dgShow(d);
-    if(o.truncated)toast('⚠️ التصميم طويل واقتُطع — بسّط الطلب.','err');
+    if(r.truncated)toast('⚠️ التصميم طويل واقتُطع — بسّط الطلب.','err');
   }catch(e){
     out.innerHTML='<div class="card" style="border-color:var(--expense)">⚠️ '+esc(e.message)+'</div>';
   }
@@ -2376,21 +2372,17 @@ async function sfRun(){
   out.innerHTML='<div class="card" style="text-align:center;padding:30px">'
     +'<div style="font-size:30px">🧠</div>'
     +'<div style="margin-top:10px;font-size:14px">جارٍ إعداد دراسة الجدوى...</div>'
-    +'<div style="margin-top:6px;font-size:12.5px;color:var(--muted)">يقرأ المرفقات ويحسب المؤشرات — قد يستغرق دقيقة إلى دقيقتين.</div></div>';
+    +'<div id="sf-prog" style="margin-top:6px;font-size:12.5px;color:var(--muted)">يقرأ المرفقات ويحسب...</div></div>';
   try{
-    const url=aiUrl();
-    if(!auth||!auth.currentUser)throw new Error('سجّل دخولك في اللوحة أولًا.');
-    const token=await auth.currentUser.getIdToken();
-    const res=await fetch(url,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body:JSON.stringify({mode:'feasibility',prompt:prompt||'أعدّ دراسة جدوى بناءً على الملفات المرفقة.',files:usable})
-    });
-    const o=await res.json().catch(()=>({error:'رد غير مفهوم من الوسيط (HTTP '+res.status+')'}));
-    if(!res.ok||o.error)throw new Error(o.error||('HTTP '+res.status));
-    LAST_STUDY=o.study;
-    out.innerHTML=studyHtml(o.study);
-    if(o.truncated)toast('⚠️ الدراسة طويلة واقتُطع آخرها — قسّم الطلب.','err');
+    const r=await aiSend(
+      {mode:'feasibility',prompt:prompt||'أعدّ دراسة جدوى بناءً على الملفات المرفقة.',files:usable},
+      (n,th)=>{ const p=document.getElementById('sf-prog');
+        if(p)p.textContent=th?'يحلّل ويحسب المؤشرات...':('يكتب الدراسة... '+fmt(n)+' حرفًا'); }
+    );
+    let study; try{ study=JSON.parse(r.text); }catch(_){ throw new Error('تعذّر تفسير مخرجات الدراسة. أعد المحاولة.'); }
+    LAST_STUDY=study;
+    out.innerHTML=studyHtml(study);
+    if(r.truncated)toast('⚠️ الدراسة طويلة واقتُطع آخرها — قسّم الطلب.','err');
   }catch(e){
     out.innerHTML='<div class="card" style="border-color:var(--expense)">⚠️ '+esc(e.message)+'</div>';
   }
@@ -2604,8 +2596,8 @@ async function aiTest(){
     toast('✅ الوسيط يعمل — رد النموذج: '+esc(r.slice(0,60)),'ok');
   }catch(e){ toast('⚠️ '+esc(e.message),'err'); }
 }
-/* يرسل الطلب للوسيط مرفقًا برمز دخول Firebase */
-async function aiCall(prompt,data){
+/* المحرّك: يرسل الطلب ويقرأ البث لحظة بلحظة (يمنع انقطاع المهلة على الطلبات الطويلة) */
+async function aiSend(body,onProgress){
   const url=aiUrl();
   if(!url)throw new Error('لم يُضبط رابط الوسيط. اضغط ⚙️ إعداد.');
   if(!auth||!auth.currentUser)throw new Error('سجّل دخولك في اللوحة أولًا.');
@@ -2613,11 +2605,46 @@ async function aiCall(prompt,data){
   const res=await fetch(url,{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-    body:JSON.stringify({prompt,data})
+    body:JSON.stringify(body)
   });
-  const out=await res.json().catch(()=>({error:'رد غير مفهوم من الوسيط (HTTP '+res.status+')'}));
-  if(!res.ok||out.error)throw new Error(out.error||('HTTP '+res.status));
-  return out.text+(out.truncated?'\n\n⚠️ (اقتُطع الرد لطوله — اطلب تفصيلًا أقل أو قسّم الطلب)':'');
+  const ct=res.headers.get('content-type')||'';
+  if(!res.ok||ct.indexOf('application/json')>=0){
+    const o=await res.json().catch(()=>({error:'رد غير مفهوم من الوسيط (HTTP '+res.status+')'}));
+    throw new Error(o.error||('HTTP '+res.status));
+  }
+  if(!res.body)throw new Error('متصفحك لا يدعم البث — حدّثه أو استخدم Chrome.');
+
+  const reader=res.body.getReader(), dec=new TextDecoder();
+  let buf='',out='',stop='',thinking=false;
+  while(true){
+    const {done,value}=await reader.read();
+    if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    let i;
+    while((i=buf.indexOf('\n'))>=0){
+      const line=buf.slice(0,i).trim(); buf=buf.slice(i+1);
+      if(line.indexOf('data:')!==0)continue;
+      const p=line.slice(5).trim();
+      if(!p||p==='[DONE]')continue;
+      let ev; try{ ev=JSON.parse(p); }catch(_){ continue; }
+      if(ev.type==='error')throw new Error((ev.error&&ev.error.message)||'انقطع البث.');
+      if(ev.type==='content_block_start'&&ev.content_block&&ev.content_block.type==='thinking')thinking=true;
+      if(ev.type==='content_block_delta'&&ev.delta){
+        if(ev.delta.type==='text_delta'){ thinking=false; out+=ev.delta.text; }
+        if(onProgress)onProgress(out.length,thinking);
+      }
+      if(ev.type==='message_delta'&&ev.delta&&ev.delta.stop_reason)stop=ev.delta.stop_reason;
+    }
+  }
+  if(stop==='refusal')throw new Error('اعتذر النموذج عن تنفيذ هذا الطلب. أعد صياغته.');
+  return {text:out.trim(),truncated:stop==='max_tokens'};
+}
+
+/* ردّ نصّي حر */
+async function aiCall(prompt,data){
+  const r=await aiSend({mode:'chat',prompt,data});
+  if(!r.text)throw new Error('لم يُرجع النموذج نصًّا. أعد صياغة الطلب.');
+  return r.text+(r.truncated?'\n\n⚠️ (اقتُطع الرد لطوله — اطلب تفصيلًا أقل أو قسّم الطلب)':'');
 }
 /* عرض مبسّط لتنسيق Markdown */
 function mdToHtml(s){

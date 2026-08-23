@@ -149,6 +149,11 @@
   img,svg,video,canvas{max-width:100%}
   .hero-text{min-width:0}
   .stat,.card,.tool-card{min-width:0}
+  /* وضع القراءة فقط */
+  body.is-readonly .main input:disabled,
+  body.is-readonly .main select:disabled,
+  body.is-readonly .main textarea:disabled{opacity:.65;cursor:not-allowed}
+  body.is-readonly .main [contenteditable="false"]{cursor:default}
   /* أي عنصر داخل شبكة أو فليكس لا يتمدّد فوق عرض الشاشة */
   .app>*,.view,.card,.tbl-wrap,.stat-row,.grid,.form-row,.toolbar,.tabs{min-width:0;max-width:100%}
   .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -275,6 +280,8 @@
         <span id="sync-pill" class="pill y">☁️ غير متصل</span>
         <button class="btn ghost sm" type="button" onclick="syncPull(true)" title="اسحب أحدث البيانات">⬇️</button>
         <button class="btn ghost sm" type="button" onclick="syncPushAll()" title="ارفع بيانات هذا الجهاز">⬆️</button>
+        <button class="btn ghost sm" type="button" onclick="backupExport()" title="نزّل نسخة احتياطية كاملة">💾</button>
+        <button class="btn ghost sm" type="button" onclick="backupImport()" title="استعد من نسخة احتياطية">📂</button>
       </div>
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
         <button class="btn ghost sm" id="btn-access" style="display:none" onclick="openAccess()">🔑 الصلاحيات</button>
@@ -493,8 +500,45 @@
         <div class="stat" style="padding:9px 16px"><div class="v" id="dz-count" style="font-size:18px">0</div><div class="l" id="dz-size">0 ب</div></div>
       </div>
       <div class="tabs" id="dg-tabs">
-        <button class="active" onclick="dgTab('studio',this)">🪄 استوديو التصميم الذكي</button>
+        <button class="active" onclick="dgTab('poster',this)">🖼️ تصميم بالصور</button>
+        <button onclick="dgTab('studio',this)">🪄 تصميم متجهي</button>
         <button onclick="dgTab('files',this)">📁 مكتبة الملفات</button>
+      </div>
+
+      <!-- Image poster studio: OpenAI background + precise Arabic text layer -->
+      <div id="dg-poster">
+        <div class="card" style="border-color:var(--brand)">
+          <label style="font-size:14px">١) صف التصميم الذي تريده</label>
+          <textarea id="ps-brief" style="min-height:100px;font-size:14px"
+            placeholder="مثال: بانر لمبادرة أثر لجمع الملابس المستعملة. خلفية عصرية بأجهزة كهربائية وملابس مطوية، ألوان أخضر وذهبي، مساحة فارغة يمين اللوحة للنصوص."></textarea>
+
+          <div class="form-row" style="margin-top:12px">
+            <div style="grid-column:1/-2"><label>العنوان الرئيسي</label><input id="ps-h1" placeholder="مبادرة أثر"></div>
+            <div><label>المقاس</label>
+              <select id="ps-size">
+                <option value="1536x1024">عريض ٣:٢ (بانر)</option>
+                <option value="1024x1024">مربّع (سوشيال)</option>
+                <option value="1024x1536">عمودي (ستوري / بوستر)</option>
+              </select>
+            </div>
+            <div style="grid-column:1/-1"><label>العنوان الفرعي</label><input id="ps-h2" placeholder="لجمع الملابس المستعملة — يصلك مندوبنا مجانًا"></div>
+            <div><label>رقم التواصل</label><input id="ps-tel" placeholder="050 300 7028" dir="ltr" style="text-align:right"></div>
+            <div style="grid-column:2/-1"><label>رابط للـ QR (اختياري)</label><input id="ps-qr" placeholder="https://..." dir="ltr" style="text-align:left"></div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="ps-logo" checked style="width:18px;height:18px;min-height:0"> أضِف شعار مبادرة أثر
+          </label>
+
+          <div class="toolbar" style="margin-top:14px">
+            <button class="btn" type="button" onclick="psRun()">🖼️ أنشئ التصميم</button>
+            <button class="btn ghost sm" type="button" onclick="psRun(true)" id="ps-again" style="display:none">🔁 خلفية أخرى</button>
+            <button class="btn ghost sm" type="button" onclick="psHelp()">❓</button>
+          </div>
+          <p id="ps-note" style="margin:10px 0 0;font-size:12px;color:var(--muted);line-height:1.9"></p>
+        </div>
+
+        <div id="ps-out" style="margin-top:16px"></div>
+        <div id="ps-editor" style="margin-top:14px"></div>
       </div>
 
       <!-- AI design studio -->
@@ -826,6 +870,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js" defer></script>
 
 <script>
 /* ---- Firebase init ---- */
@@ -948,6 +993,40 @@ function syncLive(){
   },()=>syncBadge('err'));
 }
 function syncStop(){ if(SYNC_UNSUB){ try{SYNC_UNSUB();}catch(_){} SYNC_UNSUB=null; } }
+
+/* ===== نسخة احتياطية كاملة: تنزيل واستعادة ===== */
+function backupExport(){
+  const data={app:'مبادرة أثر',version:1,at:new Date().toISOString(),
+    by:(auth&&auth.currentUser&&auth.currentUser.email)||'',keys:{}};
+  SYNC_KEYS.forEach(k=>{ const v=localStorage.getItem(k); if(v!=null)data.keys[k]=v; });
+  const blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='نسخة-أثر-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  toast('⬇️ نُزّلت نسخة كاملة من بياناتك.','ok');
+}
+function backupImport(){
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json';
+  inp.onchange=async()=>{
+    const f=inp.files&&inp.files[0]; if(!f)return;
+    try{
+      const d=JSON.parse(await f.text());
+      if(!d||!d.keys)throw new Error('الملف ليس نسخة أثر');
+      const n=Object.keys(d.keys).length;
+      if(!confirm('استعادة '+n+' قسمًا من نسخة '+(d.at||'').slice(0,10)+'؟\n\nستُستبدل البيانات الحالية على هذا الجهاز وعلى السحابة.'))return;
+      Object.keys(d.keys).forEach(k=>{
+        if(SYNC_KEYS.indexOf(k)<0)return;
+        localStorage.setItem(k,d.keys[k]);
+        localStorage.setItem('at_'+k,String(Date.now()));
+      });
+      refreshAll();
+      await syncPushAll();
+      toast('✅ استُعيدت النسخة ورُفعت للسحابة.','ok');
+    }catch(e){ toast('⚠️ تعذّرت الاستعادة: '+esc(e.message||e),'err'); }
+  };
+  inp.click();
+}
 
 /* يرفع كل ما هو محلي إلى السحابة (أول مرة أو بعد انقطاع) */
 async function syncPushAll(){
@@ -1851,8 +1930,194 @@ let DG_REFS=[], DG_CUR=null;
 function dgTab(which,btn){
   document.querySelectorAll('#dg-tabs button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  document.getElementById('dg-poster').style.display=which==='poster'?'':'none';
   document.getElementById('dg-studio').style.display=which==='studio'?'':'none';
   document.getElementById('dg-files-tab').style.display=which==='files'?'':'none';
+}
+
+/* ================= تصميم بالصور: خلفية OpenAI + طبقة نصوص دقيقة ================= */
+let PS={img:null,layout:null,W:1536,H:1024};
+
+function psNote(m,c){ const e=document.getElementById('ps-note'); if(e){e.innerHTML=m||'';e.style.color=c||'var(--muted)';} }
+
+async function psRun(bgOnly){
+  const brief=document.getElementById('ps-brief').value.trim();
+  if(!brief&&!bgOnly)return toast('⚠️ صف التصميم أولًا.','err');
+  const size=document.getElementById('ps-size').value;
+  const [W,H]=size.split('x').map(Number); PS.W=W; PS.H=H;
+  const h1=document.getElementById('ps-h1').value.trim();
+  const h2=document.getElementById('ps-h2').value.trim();
+  const tel=document.getElementById('ps-tel').value.trim();
+  const qr=document.getElementById('ps-qr').value.trim();
+  const wantLogo=document.getElementById('ps-logo').checked;
+
+  const out=document.getElementById('ps-out');
+  out.innerHTML='<div class="card" style="text-align:center;padding:28px"><div style="font-size:28px">🎨</div>'
+    +'<div id="ps-step" style="margin-top:10px;font-size:14px">جارٍ التخطيط...</div></div>';
+  const step=t=>{const e=document.getElementById('ps-step'); if(e)e.textContent=t;};
+
+  try{
+    /* ١) Claude يخطّط: وصف الخلفية + مواضع النصوص */
+    if(!bgOnly||!PS.layout){
+      step('يخطّط التكوين ويوزّع النصوص...');
+      const brief2=brief+'\n\nالنصوص المطلوبة على التصميم:'
+        +(h1?('\n- عنوان رئيسي: '+h1):'')
+        +(h2?('\n- عنوان فرعي: '+h2):'')
+        +(tel?('\n- رقم تواصل: '+tel):'')
+        +(qr?'\n- رمز QR':'')
+        +(wantLogo?'\n- شعار المبادرة':'')
+        +'\n\nنسبة اللوحة: '+W+'×'+H;
+      const r=await aiSend({mode:'layout',prompt:brief2});
+      PS.layout=JSON.parse(r.text);
+      /* استبدل نصوص النموذج بنصوص المستخدم الحرفية */
+      psApplyUserText(h1,h2,tel,qr,wantLogo);
+    }
+    /* ٢) OpenAI يولّد الخلفية بلا أي نص */
+    step('يرسم الخلفية... (٢٠–٤٠ ثانية)');
+    const token=await auth.currentUser.getIdToken();
+    const res=await fetch(aiUrl(),{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({mode:'image',prompt:PS.layout.imagePrompt,size})
+    });
+    const o=await res.json().catch(()=>({error:'رد غير مفهوم (HTTP '+res.status+')'}));
+    if(!res.ok||o.error)throw new Error(o.error||('HTTP '+res.status));
+    PS.img='data:image/png;base64,'+o.image;
+    psNote('المحرّك: '+esc(o.model||'')+' · الخلفية بلا نصوص، والنصوص تُرسم فوقها بدقة.');
+    await psRender();
+    document.getElementById('ps-again').style.display='';
+  }catch(e){
+    out.innerHTML='<div class="card" style="border-color:var(--expense)">⚠️ '+esc(e.message)+'</div>';
+  }
+}
+
+/* يضمن أن النصوص المعروضة هي ما كتبه المستخدم حرفيًا */
+function psApplyUserText(h1,h2,tel,qr,wantLogo){
+  const items=(PS.layout.items||[]).filter(i=>i&&i.kind);
+  const pick=(k)=>items.find(i=>i.kind===k);
+  const texts=items.filter(i=>i.kind==='text');
+  if(h1){ if(texts[0])texts[0].text=h1; else items.push({kind:'text',text:h1,x:50,y:18,size:9,color:'#ffffff',weight:'bold',align:'center'}); }
+  if(h2){ if(texts[1])texts[1].text=h2; else items.push({kind:'text',text:h2,x:50,y:32,size:5,color:'#ffffff',weight:'normal',align:'center'}); }
+  if(tel){ const p=pick('phone'); if(p)p.text=tel; else items.push({kind:'phone',text:tel,x:50,y:78,size:6,color:'#d4a017',weight:'bold',align:'center'}); }
+  if(qr){ const q=pick('qr'); if(q)q.text=qr; else items.push({kind:'qr',text:qr,x:12,y:75,size:16,color:'#ffffff',weight:'normal',align:'center'}); }
+  else { const i=items.findIndex(x=>x.kind==='qr'); if(i>=0)items.splice(i,1); }
+  if(wantLogo){ if(!pick('logo'))items.push({kind:'logo',text:'',x:88,y:14,size:14,color:'',weight:'normal',align:'center'}); }
+  else { const i=items.findIndex(x=>x.kind==='logo'); if(i>=0)items.splice(i,1); }
+  PS.layout.items=items;
+}
+
+/* الرسم: الخلفية ثم كل عنصر بموضعه */
+async function psRender(){
+  const {W,H}=PS;
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const cx=cv.getContext('2d');
+  const bg=await psImg(PS.img);
+  cx.drawImage(bg,0,0,W,H);
+
+  for(const it of (PS.layout.items||[])){
+    const x=W*(1-(Number(it.x)||0)/100);          /* 0 = يمين اللوحة */
+    const y=H*((Number(it.y)||0)/100);
+    if(it.kind==='qr'&&it.text){
+      const s=H*((Number(it.size)||14)/100);
+      const q=await psQR(it.text,Math.round(s));
+      if(q){ cx.fillStyle='#fff'; cx.fillRect(x-s/2-6,y-s/2-6,s+12,s+12); cx.drawImage(q,x-s/2,y-s/2,s,s); }
+      continue;
+    }
+    if(it.kind==='logo'){
+      const s=H*((Number(it.size)||14)/100);
+      try{ const lg=await psImg('logo3d-mark.png'); const r=lg.width/lg.height;
+           cx.drawImage(lg,x-(s*r)/2,y-s/2,s*r,s); }catch(_){}
+      continue;
+    }
+    const fs=H*((Number(it.size)||5)/100);
+    cx.font=(it.weight==='bold'?'bold ':'')+fs+'px Tahoma, Arial, sans-serif';
+    cx.direction='rtl';
+    cx.textAlign=it.align==='center'?'center':(it.align==='left'?'left':'right');
+    cx.textBaseline='middle';
+    cx.shadowColor='rgba(0,0,0,.55)'; cx.shadowBlur=fs*0.18; cx.shadowOffsetY=fs*0.05;
+    cx.fillStyle=it.color||'#ffffff';
+    cx.fillText(it.text||'',x,y);
+    cx.shadowColor='transparent';
+  }
+  PS.png=cv.toDataURL('image/png');
+  document.getElementById('ps-out').innerHTML=
+    '<div class="card" style="border-color:var(--brand)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+    +'<b style="font-size:15px">'+esc((PS.layout&&PS.layout.title)||'التصميم')+'</b>'
+    +'<div style="display:flex;gap:6px"><button class="btn ghost sm" type="button" onclick="psDownload()">⬇️ تنزيل PNG</button>'
+    +'<button class="btn ghost sm" type="button" onclick="psPrint()">🖨️</button></div></div>'
+    +'<img src="'+PS.png+'" style="width:100%;border-radius:10px;display:block">'
+    +'<div style="font-size:11.5px;color:var(--muted);margin-top:8px">'+fmt(W)+' × '+fmt(H)+' بكسل</div></div>';
+  psEditor();
+}
+
+function psImg(src){
+  return new Promise((res,rej)=>{ const i=new Image(); i.crossOrigin='anonymous';
+    i.onload=()=>res(i); i.onerror=()=>rej(new Error('تعذّر تحميل صورة')); i.src=src; });
+}
+function psQR(text,size){
+  return new Promise(res=>{
+    if(typeof QRious==='undefined')return res(null);
+    try{
+      const q=new QRious({value:text,size:Math.max(200,size*3),level:'H',background:'#ffffff',foreground:'#0d3b2e'});
+      const i=new Image(); i.onload=()=>res(i); i.onerror=()=>res(null); i.src=q.toDataURL();
+    }catch(_){ res(null); }
+  });
+}
+
+/* محرّر مباشر: كل عنصر بحجمه وموضعه ولونه */
+function psEditor(){
+  const items=(PS.layout&&PS.layout.items)||[];
+  if(!items.length){ document.getElementById('ps-editor').innerHTML=''; return; }
+  const label={text:'نص',phone:'رقم',qr:'QR',logo:'شعار'};
+  let h='<div class="card"><b style="font-size:14px">✏️ ضبط العناصر</b>'
+    +'<p style="margin:6px 0 14px;font-size:12px;color:var(--muted)">حرّك المؤشرات وشاهد النتيجة فورًا — الموضع بالنسبة المئوية من يمين اللوحة.</p>';
+  items.forEach((it,i)=>{
+    h+='<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px">'
+      +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">'
+      +'<span class="pill g">'+label[it.kind]+'</span>'
+      +(it.kind==='logo'?'':'<input value="'+esc(it.text||'')+'" oninput="psSet('+i+',\'text\',this.value)" style="flex:1;min-width:160px">')
+      +(it.kind==='logo'||it.kind==='qr'?'':'<input type="color" value="'+esc(/^#/.test(it.color)?it.color:'#ffffff')+'" oninput="psSet('+i+',\'color\',this.value)" style="width:44px;padding:2px;min-height:36px">')
+      +'<button class="btn danger sm" type="button" onclick="psDel('+i+')">حذف</button></div>'
+      +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;font-size:11.5px;color:var(--muted)">'
+      +'<label>يمين↔يسار <input type="range" min="0" max="100" value="'+(it.x||0)+'" oninput="psSet('+i+',\'x\',+this.value)" style="width:100%"></label>'
+      +'<label>أعلى↔أسفل <input type="range" min="0" max="100" value="'+(it.y||0)+'" oninput="psSet('+i+',\'y\',+this.value)" style="width:100%"></label>'
+      +'<label>الحجم <input type="range" min="2" max="30" step="0.5" value="'+(it.size||5)+'" oninput="psSet('+i+',\'size\',+this.value)" style="width:100%"></label>'
+      +'</div></div>';
+  });
+  h+='</div>';
+  document.getElementById('ps-editor').innerHTML=h;
+}
+let _psT=null;
+function psSet(i,k,v){
+  if(!PS.layout||!PS.layout.items[i])return;
+  PS.layout.items[i][k]=v;
+  clearTimeout(_psT); _psT=setTimeout(()=>psRender(),180);
+}
+function psDel(i){ PS.layout.items.splice(i,1); psRender(); }
+function psDownload(){
+  if(!PS.png)return;
+  const a=document.createElement('a'); a.href=PS.png;
+  a.download=((PS.layout&&PS.layout.title)||'تصميم').replace(/[\\/:*?"<>|]/g,'-')+'.png'; a.click();
+  toast('⬇️ نُزّل التصميم.','ok');
+}
+function psPrint(){
+  if(!PS.png)return;
+  const w=window.open('','_blank');
+  w.document.write('<html><head><meta charset="utf-8"><style>body{margin:0;display:grid;place-items:center;min-height:100vh}img{max-width:100%}@page{margin:6mm}</style></head><body><img src="'+PS.png+'"></body></html>');
+  w.document.close(); setTimeout(()=>w.print(),500);
+}
+function psHelp(){
+  dlg('❓ كيف يعمل التصميم بالصور',
+    '<p style="margin:0 0 14px">يجمع محرّكين ليعطيك أفضل ما فيهما:</p>'
+    +'<div style="background:var(--panel2);border-radius:10px;padding:14px;margin-bottom:14px;line-height:2">'
+    +'<b style="color:var(--brand)">١) OpenAI</b> يرسم الخلفية — <b>بلا أي نص</b>، لأن نماذج الصور تشوّه العربية.<br>'
+    +'<b style="color:var(--brand)">٢) Claude</b> يخطّط: يصف الخلفية ويوزّع النصوص بمواضعها.<br>'
+    +'<b style="color:var(--brand)">٣) لوحتك</b> ترسم النصوص والأرقام والـ QR فوق الصورة بدقة كاملة.'
+    +'</div>'
+    +'<p style="margin:0 0 10px"><b>النتيجة:</b> جمال الصورة المولّدة، مع نصوص عربية سليمة ورقم هاتف صحيح و QR يعمل فعلًا.</p>'
+    +'<p style="margin:0;color:var(--muted);font-size:12.5px">🔁 «خلفية أخرى» يولّد خلفية جديدة ويبقي نصوصك ومواضعها كما ضبطتها.<br>'
+    +'✏️ المؤشرات تحرّك كل عنصر وتغيّر حجمه ولونه، والنتيجة تتحدّث فورًا.</p>');
 }
 
 /* ---- تعقيم SVG: يمنع أي كود قابل للتنفيذ داخل التصميم ---- */
@@ -3035,26 +3300,51 @@ const SECTIONS=[
 const ROLES=[{k:'admin',n:'مدير'},{k:'employee',n:'موظف'},{k:'secretary',n:'سكرتير'}];
 const ACCESS_DEFAULT={ admin:SECTIONS.map(s=>s.v), employee:['home','marketing','design','agenda'], secretary:['home','secretary','agenda','design'] };
 function roleName(k){ const r=ROLES.find(r=>r.k===k); return r?r.n:k; }
-function allowedFor(role){
-  let list=(role==='admin')?SECTIONS.map(s=>s.v):((ACCESS_DEFAULT[role]||[]).slice());
+/* الأقسام المسموحة: اختيار المدير الصريح إن وُجد، وإلا افتراضي الدور */
+function allowedFor(role,views){
+  let list=(Array.isArray(views)&&views.length)?views.slice()
+          :((role==='admin')?SECTIONS.map(s=>s.v):((ACCESS_DEFAULT[role]||[]).slice()));
   if(list.includes('marketing'))list.push('peaks','requests');
+  if(!list.includes('home'))list.unshift('home');
   return list;
 }
 function applyAccess(){
   if(!CUR)return;
-  const allowed=allowedFor(CUR.role);
+  const allowed=allowedFor(CUR.role,CUR.views);
   document.querySelectorAll('#nav button').forEach(b=>{ b.style.display=allowed.includes(b.dataset.view)?'':'none'; });
-  document.getElementById('sess-info').innerHTML=`👤 ${esc(CUR.name)} <span style="opacity:.7">(${roleName(CUR.role)})</span>`;
+  document.querySelectorAll('.tool-card[data-goto]').forEach(c=>{ c.style.display=allowed.includes(c.dataset.goto)?'':'none'; });
+  const ro=!!CUR.readonly&&CUR.role!=='admin';
+  document.body.classList.toggle('is-readonly',ro);
+  document.getElementById('sess-info').innerHTML='👤 '+esc(CUR.name)
+    +' <span style="opacity:.7">('+roleName(CUR.role)+(ro?' — قراءة فقط':'')+')</span>';
   document.getElementById('btn-access').style.display=CUR.role==='admin'?'':'none';
   const active=document.querySelector('.view.active');
   const curV=active?active.id.replace('view-',''):'home';
   if(!allowed.includes(curV))show(allowed[0]||'home');
+  if(ro)lockReadonly();
+}
+/* وضع القراءة فقط: يقفل كل ما يعدّل البيانات ويُبقي العرض والطباعة والتصدير */
+function lockReadonly(){
+  document.querySelectorAll('.main input,.main select,.main textarea').forEach(el=>{
+    if(el.type==='file')return;
+    el.disabled=true;
+  });
+  document.querySelectorAll('[contenteditable="true"]').forEach(el=>el.setAttribute('contenteditable','false'));
+  document.querySelectorAll('.main button').forEach(b=>{
+    const t=(b.textContent||'')+(b.getAttribute('onclick')||'');
+    const safe=/طباعة|🖨️|تصدير|⬇️|عرض|جدول|شرح|❓|فتح|Tab\(|show\(|dlg\(/i.test(t);
+    if(!safe){ b.disabled=true; b.style.opacity='.45'; b.style.cursor='not-allowed'; }
+  });
 }
 async function loadRole(email){
   email=(email||'').toLowerCase();
-  if(email===OWNER_EMAIL)return 'admin';
-  try{ const d=await fdb.collection('roles').doc(email).get(); return d.exists?(d.data().role||'employee'):'employee'; }
-  catch(e){ return 'employee'; }
+  if(email===OWNER_EMAIL)return {role:'admin',views:null,readonly:false};
+  try{
+    const d=await fdb.collection('roles').doc(email).get();
+    if(!d.exists)return {role:'employee',views:null,readonly:false};
+    const o=d.data()||{};
+    return {role:o.role||'employee',views:Array.isArray(o.views)?o.views:null,readonly:!!o.readonly};
+  }catch(e){ return {role:'employee',views:null,readonly:false}; }
 }
 function initAuth(){
   if(!auth){ if(window.__showErr)window.__showErr('⚠️ لا يمكن تسجيل الدخول: تعذّر الاتصال بـ Firebase. حدّث الصفحة (Ctrl+Shift+R) وتأكّد من الإنترنت.'); return; }
@@ -3066,9 +3356,10 @@ function initAuth(){
       document.getElementById('sess-box').style.display='block';
       CUR={email,role:'employee',name:email.split('@')[0]};
       applyAccess();
-      let role='employee';
-      try{ role=await loadRole(email); }catch(e){}
-      CUR.role=role; applyAccess();
+      let acc={role:'employee',views:null,readonly:false};
+      try{ acc=await loadRole(email); }catch(e){}
+      CUR.role=acc.role; CUR.views=acc.views; CUR.readonly=acc.readonly;
+      applyAccess();
       syncPull(false).then(()=>syncLive());   /* اسحب ثم استمع للتحديثات لحظيًا */
     }else{
       CUR=null;
@@ -3095,29 +3386,72 @@ function logout(){ auth.signOut(); }
 async function openAccess(){
   const g=document.getElementById('access-grid'); g.innerHTML='<p style="color:var(--muted);font-size:12px">جارٍ التحميل...</p>';
   document.getElementById('access-ov').style.display='grid';
-  let rows=[]; try{ const snap=await fdb.collection('roles').get(); snap.forEach(d=>rows.push({email:d.id,role:(d.data().role||'employee')})); }catch(e){}
+  let rows=[]; try{ const snap=await fdb.collection('roles').get(); snap.forEach(d=>{const o=d.data()||{};rows.push({email:d.id,role:o.role||'employee',views:Array.isArray(o.views)?o.views:null,readonly:!!o.readonly});}); }catch(e){}
+  const secBoxes=SECTIONS.map(s=>
+    `<label style="display:flex;align-items:center;gap:7px;background:var(--panel2);border:1px solid var(--line);
+      border-radius:8px;padding:8px 10px;font-size:12.5px;cursor:pointer">
+      <input type="checkbox" class="ur-sec" value="${s.v}" style="width:17px;height:17px;min-height:0"> ${esc(s.n)}</label>`).join('');
   let html=`<div class="acc-role"><h4>➕ إضافة/تعديل صلاحية موظف</h4>
     <div class="form-row">
       <div style="grid-column:1/-2"><label>بريد الموظف</label><input id="ur-email" type="email" placeholder="employee@example.com"></div>
-      <div><label>الدور</label><select id="ur-role"><option value="employee">موظف</option><option value="secretary">سكرتير</option><option value="admin">مدير</option></select></div>
-      <div><button class="btn" onclick="saveUserRole()">حفظ</button></div>
+      <div><label>الدور</label><select id="ur-role" onchange="urPreset(this.value)"><option value="employee">موظف</option><option value="secretary">سكرتير</option><option value="admin">مدير</option></select></div>
     </div>
-    <p style="font-size:11.5px;color:var(--muted);margin:8px 0 0">أنشئ حساب الموظف أولًا في Firebase (Authentication ← Users)، ثم عيّن دوره هنا.</p></div>`;
-  html+=`<div class="acc-role"><h4>الموظفون وأدوارهم</h4>
+    <label style="margin-top:12px">الأقسام التي يراها</label>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">${secBoxes}</div>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn ghost sm" type="button" onclick="urAll(true)">تحديد الكل</button>
+      <button class="btn ghost sm" type="button" onclick="urAll(false)">إلغاء الكل</button>
+    </div>
+    <label style="display:flex;align-items:center;gap:9px;margin-top:14px;font-size:13.5px;cursor:pointer;
+      background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px 12px">
+      <input type="checkbox" id="ur-ro" style="width:18px;height:18px;min-height:0">
+      <span>👁️ <b>قراءة فقط</b> — يرى الأقسام ولا يعدّل شيئًا (تبقى الطباعة والتصدير متاحة)</span>
+    </label>
+    <div class="toolbar" style="margin-top:14px"><button class="btn" onclick="saveUserRole()">💾 حفظ الصلاحية</button></div>
+    <p style="font-size:11.5px;color:var(--muted);margin:10px 0 0;line-height:1.9">
+      أنشئ حساب الموظف أولًا في Firebase (Authentication ← Users)، ثم عيّن صلاحيته هنا.<br>
+      «الرئيسية» متاحة دائمًا للجميع. و«المدير» يرى كل شيء ويعدّل دائمًا.</p></div>`;
+  html+=`<div class="acc-role"><h4>الموظفون وصلاحياتهم</h4>
     <div style="font-size:12.5px;color:var(--muted);margin-bottom:6px">${esc(OWNER_EMAIL)} — مدير (المالك)</div>`;
-  if(rows.length)rows.forEach(r=>{ html+=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13px">
-    <span>${esc(r.email)} — <b>${roleName(r.role)}</b></span>
+  if(rows.length)rows.forEach(r=>{
+    const secs=(r.views&&r.views.length)?r.views.map(v=>{const s=SECTIONS.find(x=>x.v===v);return s?s.n:v;}).join('، '):'(افتراضي الدور)';
+    html+=`<div style="display:flex;justify-content:space-between;align-items:start;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin-top:6px;font-size:13px">
+    <span>${esc(r.email)} — <b>${roleName(r.role)}</b>${r.readonly?' <span class="pill y">👁️ قراءة فقط</span>':''}
+      <br><span style="color:var(--muted);font-size:11.5px">${esc(secs)}</span>
+      <br><button class="btn ghost sm" type="button" style="margin-top:6px" onclick="urLoad('${esc(r.email)}')">تعديل</button></span>
     <button class="btn danger sm" onclick="delUserRole('${esc(r.email)}')">حذف</button></div>`; });
   else html+=`<p style="font-size:12px;color:var(--muted)">لا يوجد موظفون بعد.</p>`;
   html+=`</div>`;
   g.innerHTML=html;
 }
 function closeAccess(){ document.getElementById('access-ov').style.display='none'; }
+function urAll(on){ document.querySelectorAll('.ur-sec').forEach(c=>c.checked=on); }
+function urPreset(role){
+  const def=ACCESS_DEFAULT[role]||[];
+  document.querySelectorAll('.ur-sec').forEach(c=>c.checked=def.includes(c.value));
+}
+async function urLoad(email){
+  document.getElementById('ur-email').value=email;
+  try{
+    const d=await fdb.collection('roles').doc(email).get();
+    const o=d.exists?(d.data()||{}):{};
+    document.getElementById('ur-role').value=o.role||'employee';
+    document.getElementById('ur-ro').checked=!!o.readonly;
+    const v=Array.isArray(o.views)?o.views:(ACCESS_DEFAULT[o.role||'employee']||[]);
+    document.querySelectorAll('.ur-sec').forEach(c=>c.checked=v.includes(c.value));
+    toast('✏️ حُمّلت صلاحية '+esc(email)+' — عدّلها واضغط حفظ.','ok');
+  }catch(e){ toast('⚠️ تعذّر التحميل: '+esc(e.message),'err'); }
+}
 function saveUserRole(){
   const email=document.getElementById('ur-email').value.trim().toLowerCase();
   const role=document.getElementById('ur-role').value;
-  if(!email)return alert('أدخل بريد الموظف');
-  fdb.collection('roles').doc(email).set({role}).then(()=>{ alert('تم الحفظ ✅'); openAccess(); }).catch(e=>alert('تعذّر الحفظ: '+e.message));
+  if(!email)return toast('⚠️ أدخل بريد الموظف.','err');
+  const views=Array.from(document.querySelectorAll('.ur-sec:checked')).map(c=>c.value);
+  if(role!=='admin'&&!views.length)return toast('⚠️ اختر قسمًا واحدًا على الأقل.','err');
+  const readonly=document.getElementById('ur-ro').checked;
+  fdb.collection('roles').doc(email).set({role,views,readonly,by:(auth.currentUser&&auth.currentUser.email)||'',at:new Date().toISOString()})
+    .then(()=>{ toast('✅ حُفظت صلاحية '+esc(email)+'.','ok'); openAccess(); })
+    .catch(e=>toast('⚠️ تعذّر الحفظ: '+esc(e.message),'err'));
 }
 function delUserRole(email){
   if(!confirm('حذف صلاحية '+email+'؟'))return;
@@ -3141,6 +3475,8 @@ if('serviceWorker' in navigator&&location.protocol==='https:'){
 }
 
 initTimeSelect(); agSetDate(0); gcAutoConnect(); aiBadge();
+document.getElementById('dg-studio').style.display='none';
+document.getElementById('dg-files-tab').style.display='none';
 document.getElementById('st-feas').style.display='none';
 document.getElementById('st-anal').style.display='none';
 document.getElementById('st-gen').style.display='none';

@@ -835,7 +835,11 @@
     <label style="margin-top:10px">كلمة المرور</label><input id="lg-pass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="btn" style="width:100%;margin-top:16px" onclick="doLogin()">دخول</button>
     <p id="lg-err" style="color:#ff8a8a;font-size:12.5px;margin:10px 0 0;min-height:16px"></p>
-    <p style="font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.7">🔐 تسجيل دخول آمن عبر Firebase. حسابات الموظفين يُنشئها المدير.</p>
+    <div style="text-align:center;margin-top:4px">
+      <button class="btn ghost sm" type="button" onclick="forgotPass()">🔑 نسيت كلمة المرور / تعيينها لأول مرة</button>
+    </div>
+    <p style="font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.8">🔐 تسجيل دخول آمن عبر Firebase.<br>
+      الموظف الجديد: اطلب من المدير دعوتك، ثم افتح الرابط في بريدك وعيّن كلمة مرورك.</p>
   </div>
 </div>
 
@@ -3407,9 +3411,14 @@ async function openAccess(){
       <input type="checkbox" id="ur-ro" style="width:18px;height:18px;min-height:0">
       <span>👁️ <b>قراءة فقط</b> — يرى الأقسام ولا يعدّل شيئًا (تبقى الطباعة والتصدير متاحة)</span>
     </label>
+    <label style="display:flex;align-items:center;gap:9px;margin-top:10px;font-size:13.5px;cursor:pointer;
+      background:var(--panel2);border:1px solid var(--brand);border-radius:9px;padding:11px 12px">
+      <input type="checkbox" id="ur-invite" checked style="width:18px;height:18px;min-height:0">
+      <span>📧 <b>أنشئ حسابه وأرسل له دعوة بالبريد</b> — يفتح الرابط ويعيّن كلمة مروره بنفسه</span>
+    </label>
     <div class="toolbar" style="margin-top:14px"><button class="btn" onclick="saveUserRole()">💾 حفظ الصلاحية</button></div>
     <p style="font-size:11.5px;color:var(--muted);margin:10px 0 0;line-height:1.9">
-      أنشئ حساب الموظف أولًا في Firebase (Authentication ← Users)، ثم عيّن صلاحيته هنا.<br>
+      لا تحتاج إنشاء الحساب يدويًّا — الدعوة تُنشئه وترسل له رابط تعيين كلمة المرور.<br>
       «الرئيسية» متاحة دائمًا للجميع. و«المدير» يرى كل شيء ويعدّل دائمًا.</p></div>`;
   html+=`<div class="acc-role"><h4>الموظفون وصلاحياتهم</h4>
     <div style="font-size:12.5px;color:var(--muted);margin-bottom:6px">${esc(OWNER_EMAIL)} — مدير (المالك)</div>`;
@@ -3418,13 +3427,80 @@ async function openAccess(){
     html+=`<div style="display:flex;justify-content:space-between;align-items:start;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin-top:6px;font-size:13px">
     <span>${esc(r.email)} — <b>${roleName(r.role)}</b>${r.readonly?' <span class="pill y">👁️ قراءة فقط</span>':''}
       <br><span style="color:var(--muted);font-size:11.5px">${esc(secs)}</span>
-      <br><button class="btn ghost sm" type="button" style="margin-top:6px" onclick="urLoad('${esc(r.email)}')">تعديل</button></span>
+      <br><span style="display:inline-flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+        <button class="btn ghost sm" type="button" onclick="urLoad('${esc(r.email)}')">✏️ تعديل</button>
+        <button class="btn ghost sm" type="button" onclick="inviteEmployee('${esc(r.email)}')">📧 إعادة إرسال الدعوة</button>
+      </span></span>
     <button class="btn danger sm" onclick="delUserRole('${esc(r.email)}')">حذف</button></div>`; });
   else html+=`<p style="font-size:12px;color:var(--muted)">لا يوجد موظفون بعد.</p>`;
   html+=`</div>`;
   g.innerHTML=html;
 }
 function closeAccess(){ document.getElementById('access-ov').style.display='none'; }
+/* ===== دعوة موظف: إنشاء حسابه + إرسال رابط تعيين كلمة المرور ===== */
+
+/* نستخدم نسخة ثانية من Firebase حتى لا يخرج المدير من حسابه أثناء الإنشاء */
+function inviterAuth(){
+  let app=null;
+  try{ app=firebase.app('inviter'); }catch(_){ app=firebase.initializeApp(firebaseConfig,'inviter'); }
+  return app.auth();
+}
+function randPass(){
+  const s='abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%';
+  let o=''; const a=new Uint32Array(20); crypto.getRandomValues(a);
+  for(let i=0;i<20;i++)o+=s[a[i]%s.length];
+  return o;
+}
+
+async function inviteEmployee(email,silent){
+  email=(email||'').trim().toLowerCase();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ toast('⚠️ بريد غير صحيح.','err'); return false; }
+  if(!auth){ toast('⚠️ تعذّر الاتصال بـ Firebase.','err'); return false; }
+  let created=false;
+  try{
+    const ia=inviterAuth();
+    try{
+      await ia.createUserWithEmailAndPassword(email,randPass());
+      created=true;
+      await ia.signOut();
+    }catch(e){
+      const code=(e&&e.code)||'';
+      if(code==='auth/email-already-in-use'){ /* موجود مسبقًا — نرسل له الرابط فقط */ }
+      else if(code==='auth/operation-not-allowed'){
+        toast('⚠️ فعّل «Email/Password» في Firebase ← Authentication ← Sign-in method.','err'); return false;
+      }
+      else if(code==='auth/invalid-email'){ toast('⚠️ بريد غير صحيح.','err'); return false; }
+      else if(code==='auth/weak-password'){ toast('⚠️ كلمة المرور المؤقتة مرفوضة — أعد المحاولة.','err'); return false; }
+      else { toast('⚠️ تعذّر إنشاء الحساب: '+esc(e.message||code),'err'); return false; }
+    }
+    await auth.sendPasswordResetEmail(email,{url:location.origin+location.pathname,handleCodeInApp:false});
+    if(!silent)toast(created
+      ? ('✅ أُنشئ حساب '+esc(email)+' وأُرسلت له دعوة لتعيين كلمة المرور.')
+      : ('📧 الحساب موجود — أُرسل رابط تعيين كلمة مرور جديد إلى '+esc(email)+'.'),'ok');
+    return true;
+  }catch(e){
+    toast('⚠️ تعذّر إرسال الدعوة: '+esc((e&&e.message)||e),'err');
+    return false;
+  }
+}
+
+/* من شاشة الدخول */
+function forgotPass(){
+  const el=document.getElementById('lg-email');
+  const email=(el.value||'').trim().toLowerCase();
+  const err=document.getElementById('lg-err');
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+    err.textContent='اكتب بريدك في الحقل أعلاه أولًا، ثم اضغط هنا.'; el.focus(); return;
+  }
+  err.style.color='#8fe6c4'; err.textContent='⏳ جارٍ الإرسال...';
+  auth.sendPasswordResetEmail(email,{url:location.origin+location.pathname,handleCodeInApp:false})
+    .then(()=>{ err.textContent='📧 أُرسل رابط تعيين كلمة المرور إلى بريدك — تفقّد صندوق الوارد و«غير المرغوب».'; })
+    .catch(e=>{ err.style.color='#ff8a8a';
+      err.textContent=(e.code==='auth/user-not-found')
+        ? 'لا يوجد حساب بهذا البريد — اطلب من المدير دعوتك أولًا.'
+        : ('تعذّر الإرسال: '+(e.message||e.code)); });
+}
+
 function urAll(on){ document.querySelectorAll('.ur-sec').forEach(c=>c.checked=on); }
 function urPreset(role){
   const def=ACCESS_DEFAULT[role]||[];
@@ -3442,16 +3518,21 @@ async function urLoad(email){
     toast('✏️ حُمّلت صلاحية '+esc(email)+' — عدّلها واضغط حفظ.','ok');
   }catch(e){ toast('⚠️ تعذّر التحميل: '+esc(e.message),'err'); }
 }
-function saveUserRole(){
+async function saveUserRole(){
   const email=document.getElementById('ur-email').value.trim().toLowerCase();
   const role=document.getElementById('ur-role').value;
   if(!email)return toast('⚠️ أدخل بريد الموظف.','err');
   const views=Array.from(document.querySelectorAll('.ur-sec:checked')).map(c=>c.value);
   if(role!=='admin'&&!views.length)return toast('⚠️ اختر قسمًا واحدًا على الأقل.','err');
   const readonly=document.getElementById('ur-ro').checked;
-  fdb.collection('roles').doc(email).set({role,views,readonly,by:(auth.currentUser&&auth.currentUser.email)||'',at:new Date().toISOString()})
-    .then(()=>{ toast('✅ حُفظت صلاحية '+esc(email)+'.','ok'); openAccess(); })
-    .catch(e=>toast('⚠️ تعذّر الحفظ: '+esc(e.message),'err'));
+  const invite=document.getElementById('ur-invite').checked;
+  try{
+    await fdb.collection('roles').doc(email).set({role,views,readonly,
+      by:(auth.currentUser&&auth.currentUser.email)||'',at:new Date().toISOString()});
+  }catch(e){ return toast('⚠️ تعذّر الحفظ: '+esc(e.message),'err'); }
+  toast('✅ حُفظت صلاحية '+esc(email)+'.','ok');
+  if(invite)await inviteEmployee(email);
+  openAccess();
 }
 function delUserRole(email){
   if(!confirm('حذف صلاحية '+email+'؟'))return;

@@ -3,7 +3,7 @@
  * يخزّن اللوحة داخل الجهاز لتفتح فورًا وتعمل بلا إنترنت.
  * رفع رقم الإصدار عند كل تحديث يمسح المخزون القديم تلقائيًا.
  */
-const CACHE = 'athar-v4';
+const CACHE = 'athar-v5';
 
 const ASSETS = [
   './',
@@ -12,6 +12,8 @@ const ASSETS = [
   './app-icon-192.png',
   './app-icon-512.png',
   './apple-touch-icon.png',
+  './logo-athr.jpg',
+  './logo-athr-icon.jpg',
   './logo3d-mark.png',
   './logo3d-word.png',
   './logo3d-icon.png',

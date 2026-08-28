@@ -30,7 +30,8 @@
   .side{background:linear-gradient(180deg,#13202d,#0e1822);border-inline-start:1px solid var(--line);padding:22px 16px;position:sticky;top:0;height:100vh}
   .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
   .brand .logo{width:42px;height:42px;display:grid;place-items:center;flex-shrink:0}
-  .brand .logo img{width:100%;height:100%;object-fit:contain;display:block;mix-blend-mode:screen}
+  .brand .logo img{width:100%;height:100%;object-fit:contain;display:block}
+  .brand .logo img.blend{mix-blend-mode:screen}   /* للصور ذات الخلفية السوداء فقط */
   .brand h1{font-size:18px;margin:0}
   .brand small{color:var(--muted);font-size:12px}
   .nav{margin-top:22px;display:flex;flex-direction:column;gap:6px}
@@ -256,7 +257,9 @@
   <!-- Sidebar -->
   <aside class="side">
     <div class="brand">
-      <div class="logo"><img src="logo-athr-icon.jpg" alt="أثر"></div>
+      <!-- شعار الشريط الجانبي: يستخدم logo-sidebar.png فور رفعه، وإلا يرجع للأيقونة الحالية -->
+      <div class="logo"><img src="logo-sidebar.png" alt="أثر"
+        onerror="this.onerror=null;this.src='logo-athr-icon.jpg';this.classList.add('blend')"></div>
       <div><h1>مبادرة أثر</h1><small>لوحة التحكم</small></div>
     </div>
     <nav class="nav" id="nav">
@@ -1100,7 +1103,9 @@ document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>show(b.dataset
 document.querySelectorAll('[data-goto]').forEach(c=>c.onclick=()=>show(c.dataset.goto));
 let CUR=null;
 function show(v){
-  if(CUR){ const al=allowedFor(CUR.role); if(!al.includes(v))return; }
+  /* لا بد من تمرير CUR.views وإلا رُفضت الأقسام التي منحها المدير يدويًّا */
+  if(CUR){ const al=allowedFor(CUR.role,CUR.views);
+    if(!al.includes(v)){ try{toast('🔒 ليس لديك صلاحية على هذا القسم — راجع المدير.','err');}catch(_){} return; } }
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='view-'+v));
   window.scrollTo(0,0);

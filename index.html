@@ -668,6 +668,39 @@
         <div><h2>📝 السكرتارية</h2><p>اكتب الخطابات الرسمية واحفظها، واستعن بالنماذج الجاهزة لفهم آلية العمل.</p></div>
         <div class="stat" style="padding:9px 16px"><div class="v" id="sc-count" style="font-size:18px">0</div><div class="l">خطاب محفوظ</div></div>
       </div>
+      <!-- نماذجي: ارفع خطاباتك القديمة ليتعلّم أسلوبك -->
+      <h3 class="sec-title">📎 نماذجي — ارفع خطاباتك السابقة</h3>
+      <div class="card" style="border-color:var(--accent)">
+        <p style="margin:0 0 12px;font-size:13px;color:var(--muted);line-height:1.9">
+          ارفع خطاباتك الجاهزة (شكر على تبرع، طلب شراكة، استلام تبرع…) بصيغة <b>Word</b> أو <b>PDF</b> أو صورة —
+          يقرؤها ويستخلص أسلوبك وصيغك الرسمية، ثم يكتب لك خطابات جديدة <b>بنفس أسلوبك</b> باسم مبادرة أثر.
+        </p>
+        <label style="display:block;margin-bottom:6px">١) ارفع نماذج خطاباتك</label>
+        <div id="lt-drop" onclick="document.getElementById('lt-files').click()"
+          ondragover="event.preventDefault();this.style.borderColor='var(--brand)'"
+          ondragleave="this.style.borderColor='var(--line)'"
+          ondrop="event.preventDefault();this.style.borderColor='var(--line)';ltAdd(event.dataTransfer.files)"
+          style="border:2px dashed var(--line);border-radius:12px;padding:18px;text-align:center;cursor:pointer;background:var(--panel2)">
+          <div style="font-size:24px">📄</div>
+          <div style="font-size:13.5px;margin-top:6px">اسحب خطاباتك هنا أو اضغط للاختيار</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:5px">Word · PDF · صور · نصوص — حتى ٢٠ ملفًا</div>
+        </div>
+        <input type="file" id="lt-files" multiple style="display:none" onchange="ltAdd(this.files)">
+        <div id="lt-list" style="margin-top:10px"></div>
+
+        <div class="form-row" style="margin-top:14px">
+          <div style="grid-column:1/-1"><label>٢) اطلب خطابًا جديدًا بأسلوبك</label>
+            <textarea id="lt-req" style="min-height:80px"
+              placeholder="مثال: خطاب شكر لشركة الراجحي للأثاث على تبرعها بـ 40 قطعة أثاث، وذكر أثر التبرع على 15 أسرة"></textarea></div>
+        </div>
+        <div class="toolbar">
+          <button class="btn" type="button" onclick="ltWrite()">✍️ اكتب الخطاب بأسلوبي</button>
+          <button class="btn ghost sm" type="button" onclick="ltStyle()">🧠 حلّل أسلوبي</button>
+          <button class="btn ghost sm" type="button" onclick="ltHelp()">❓</button>
+        </div>
+        <div id="lt-out" style="margin-top:12px"></div>
+      </div>
+
       <h3 class="sec-title">نماذج جاهزة — اضغط «استخدام كنموذج» لبدء خطاب منها</h3>
       <div id="sc-templates" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))"></div>
       <h3 class="sec-title" id="sc-editor-title">كتابة خطاب جديد</h3>
@@ -891,7 +924,8 @@ try{
 const OWNER_EMAIL='s.999.alansary@gmail.com';
 /* ===== مزامنة البيانات بين كل الأجهزة (Firestore) ===== */
 const SYNC_KEYS=['athar_mk','athar_bz','athar_ac','athar_rs','athar_rq','athar_ag',
-                 'athar_lt','athar_lg','athar_dreq','athar_lgcols','athar_lgtitle','athar_feas'];
+                 'athar_lt','athar_lg','athar_dreq','athar_lgcols','athar_lgtitle','athar_feas',
+                 'athar_mylt'];
 const _syncT={};
 let SYNC_READY=false;
 
@@ -1053,7 +1087,7 @@ async function syncPushAll(){
 function refreshAll(){
   try{
     renderMk();renderBz();renderAcc();renderLedger();renderRs();renderReq();
-    renderAgenda();renderSecretary();renderReqList();dgHistory();
+    renderAgenda();renderSecretary();ltRender();renderReqList();dgHistory();
     FEAS=feasLoad();renderFeas();renderHome();
   }catch(_){}
 }
@@ -1664,6 +1698,125 @@ function renderAgenda(){
   });
 }
 function toggleAg(id){ const arr=DB.get('ag'); const x=arr.find(a=>a.id===id); if(x)x.done=!x.done; DB.set('ag',arr); renderAgenda(); renderHome(); }
+
+/* ================= نماذجي: تعلّم الأسلوب من خطاباتك ================= */
+function ltMine(){ return DB.get('mylt'); }
+function ltSetMine(v){ DB.set('mylt',v); }
+
+function ltRender(){
+  const arr=ltMine(), el=document.getElementById('lt-list'); if(!el)return;
+  if(!arr.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:6px 2px">لا توجد نماذج بعد.</div>'; return; }
+  el.innerHTML=arr.map((f,i)=>
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--panel2);'
+    +'border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:12.5px">'
+    +'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📄 '+esc(f.name)
+    +' <span style="color:var(--muted)">— '+fmt((f.text||'').length)+' حرفًا</span></span>'
+    +'<span style="display:flex;gap:6px;flex-shrink:0">'
+    +'<button class="btn ghost sm" type="button" onclick="ltView('+i+')">عرض</button>'
+    +'<button class="btn danger sm" type="button" onclick="ltDel('+i+')">حذف</button></span></div>').join('');
+}
+function ltDel(i){ const a=ltMine(); a.splice(i,1); ltSetMine(a); ltRender(); }
+function ltView(i){
+  const f=ltMine()[i]; if(!f)return;
+  dlg('📄 '+esc(f.name),'<div style="max-height:52vh;overflow:auto;white-space:pre-wrap;font-size:13px;line-height:1.9;'
+    +'background:var(--panel2);border-radius:10px;padding:14px">'+esc(f.text||'')+'</div>');
+}
+async function ltAdd(fileList){
+  const files=Array.from(fileList||[]); if(!files.length)return;
+  const arr=ltMine();
+  toast('⏳ جارٍ قراءة الخطابات...');
+  for(const f of files){
+    if(arr.length>=20){ toast('⚠️ الحد ٢٠ نموذجًا.','err'); break; }
+    try{
+      const r=await sfReadFile(f);
+      if(r.kind==='image'){ arr.push({id:uid(),name:f.name,text:'',img:r.data,media:r.media_type}); }
+      else if((r.text||'').trim().length<40){ toast('⚠️ «'+esc(f.name)+'» لا يحوي نصًّا كافيًا.','err'); }
+      else arr.push({id:uid(),name:f.name,text:r.text.slice(0,40000)});
+    }catch(e){ toast('⚠️ '+esc(f.name)+': '+esc(e.message||'تعذّرت القراءة'),'err'); }
+  }
+  ltSetMine(arr); ltRender();
+  document.getElementById('lt-files').value='';
+  toast('✅ حُفظت النماذج — متاحة على كل أجهزتك.','ok');
+}
+
+/* يبني مرجع الأسلوب المرسَل للنموذج */
+function ltRefs(){
+  const arr=ltMine();
+  const txt=arr.filter(f=>f.text).map((f,i)=>'--- نموذج '+(i+1)+': '+f.name+' ---\n'+f.text).join('\n\n');
+  const imgs=arr.filter(f=>f.img).slice(0,4).map(f=>({name:f.name,kind:'image',media_type:f.media,data:f.img}));
+  return {txt,imgs,count:arr.length};
+}
+
+async function ltWrite(){
+  const req=document.getElementById('lt-req').value.trim();
+  if(!req)return toast('⚠️ اكتب ما تريده في الخطاب.','err');
+  const R=ltRefs();
+  if(!R.count)return toast('⚠️ ارفع نموذجًا واحدًا على الأقل ليتعلّم أسلوبك.','err');
+  const out=document.getElementById('lt-out');
+  out.innerHTML='<div class="card" style="text-align:center;padding:22px"><div style="font-size:26px">✍️</div>'
+    +'<div id="lt-step" style="margin-top:8px;font-size:13.5px">يقرأ نماذجك ويكتب...</div></div>';
+  try{
+    const prompt='اكتب خطابًا رسميًا جديدًا باسم «مبادرة أثر» بنفس أسلوب النماذج المرفقة.\n\n'
+      +'المطلوب في الخطاب:\n'+req
+      +'\n\nحاكِ في النماذج: صيغة الافتتاح والختام، درجة الرسمية، طول الفقرات، طريقة التوقيع، والمصطلحات المستخدمة.'
+      +(R.txt?('\n\nنماذج خطاباتنا السابقة:\n'+R.txt):'');
+    const r=await aiSend({mode:'letter',prompt,files:R.imgs},(n)=>{
+      const e=document.getElementById('lt-step'); if(e)e.textContent='يكتب... '+fmt(n)+' حرفًا'; });
+    let L; try{ L=JSON.parse(r.text); }catch(_){ throw new Error('تعذّر تفسير الخطاب. أعد المحاولة.'); }
+    out.innerHTML='<div class="card" style="border-color:var(--brand)">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+      +'<b style="font-size:14.5px">✅ '+esc(L.title||'خطاب جديد')+'</b>'
+      +'<button class="btn" type="button" onclick="ltUse()">📝 افتحه في المحرّر</button></div>'
+      +'<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">إلى: '+esc(L.to||'—')
+      +(L.ref?(' &nbsp;•&nbsp; المرجع: '+esc(L.ref)):'')+'</div>'
+      +'<div style="white-space:pre-wrap;line-height:2;font-size:13.5px;background:var(--panel2);border-radius:10px;padding:14px">'
+      +esc(L.body||'')+'</div>'
+      +(((L.styleNotes||L.notes||[]).length)?('<div style="margin-top:12px;font-size:12px;color:var(--muted);line-height:1.9">'
+        +'<b style="color:var(--brand)">ما استخلصته من أسلوبك:</b><br>'
+        +(L.styleNotes||L.notes).map(n=>'• '+esc(n)).join('<br>')+'</div>'):'')
+      +'</div>';
+    window.LT_NEW=L;
+  }catch(e){ out.innerHTML='<div class="card" style="border-color:var(--expense)">⚠️ '+esc(e.message)+'</div>'; }
+}
+function ltUse(){
+  const L=window.LT_NEW; if(!L)return;
+  newLetter();
+  document.getElementById('sc-title').value=L.title||'';
+  document.getElementById('sc-to').value=L.to||'';
+  document.getElementById('sc-ref').value=L.ref||'';
+  document.getElementById('sc-body').value=L.body||'';
+  document.getElementById('sc-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('sc-body').scrollIntoView({behavior:'smooth',block:'center'});
+  toast('📝 فُتح في المحرّر — عدّله واحفظه.','ok');
+}
+async function ltStyle(){
+  const R=ltRefs();
+  if(!R.count)return toast('⚠️ ارفع نماذجك أولًا.','err');
+  const out=document.getElementById('lt-out');
+  out.innerHTML='<div class="card" style="text-align:center;padding:20px">🧠 يحلّل أسلوبك...</div>';
+  try{
+    const r=await aiSend({mode:'chat',
+      prompt:'حلّل أسلوب الخطابات المرفقة تحليلًا عمليًا: صيغ الافتتاح والختام المتكررة، درجة الرسمية، '
+        +'طول الفقرات، المصطلحات المميّزة، طريقة التوقيع، وأي أخطاء متكررة يُنصح بتفاديها. '
+        +'اختم بقائمة «قواعد أسلوب مبادرة أثر» في نقاط قصيرة.\n\nالنماذج:\n'+R.txt});
+    out.innerHTML='<div class="card">'+mdToHtml(r.text)+'</div>';
+  }catch(e){ out.innerHTML='<div class="card" style="border-color:var(--expense)">⚠️ '+esc(e.message)+'</div>'; }
+}
+function ltHelp(){
+  dlg('❓ كيف تعمل «نماذجي»',
+    '<div style="line-height:2">'
+    +'<b style="color:var(--brand)">١) ارفع خطاباتك السابقة</b><br>'
+    +'Word أو PDF أو صور. تُقرأ في متصفحك ويُستخرج نصّها، ثم تُحفظ وتُزامَن على كل أجهزتك.<br><br>'
+    +'<b style="color:var(--brand)">٢) اطلب خطابًا جديدًا</b><br>'
+    +'اكتب ما تريده بالعربية العادية، فيكتبه محاكيًا افتتاحك وختامك ودرجة رسميتك ومصطلحاتك.<br><br>'
+    +'<b style="color:var(--brand)">٣) افتحه في المحرّر</b><br>'
+    +'يُنقل للمحرّر بالأسفل فتعدّله وتحفظه وتطبعه أو تصدّره Word.<br><br>'
+    +'<b style="color:var(--brand)">🧠 حلّل أسلوبي</b><br>'
+    +'يقرأ نماذجك ويخرج لك «قواعد أسلوب مبادرة أثر» — مفيدة لتدريب أي موظف جديد.'
+    +'</div>'
+    +'<div style="margin-top:14px;background:var(--panel2);border-radius:10px;padding:12px;font-size:12.5px;line-height:1.9">'
+    +'💡 كلما رفعت نماذج أكثر وأنوع، كان الخطاب الناتج أقرب لأسلوبك. ثلاثة إلى خمسة نماذج تكفي للبداية.</div>');
+}
 
 /* ---- Secretary: letters (السكرتارية) ---- */
 const LT_TEMPLATES=[
@@ -3562,7 +3715,7 @@ document.getElementById('st-feas').style.display='none';
 document.getElementById('st-anal').style.display='none';
 document.getElementById('st-gen').style.display='none';
 FEAS=feasLoad();renderFeas();renderReqList();
-renderMk();renderBz();renderAcc();renderLedger();dgHistory();renderRs();renderReq();renderPeaks();initDesign();renderAgenda();newLetter();renderSecretary();renderHome();initAuth();
+renderMk();renderBz();renderAcc();renderLedger();dgHistory();renderRs();renderReq();renderPeaks();initDesign();renderAgenda();newLetter();renderSecretary();ltRender();renderHome();initAuth();
 </script>
 </body>
 </html>

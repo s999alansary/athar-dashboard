@@ -284,6 +284,7 @@
       </div>
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
         <button class="btn ghost sm" id="btn-access" style="display:none" onclick="openAccess()">🔑 الصلاحيات</button>
+        <button class="btn ghost sm" id="btn-lang" type="button" onclick="i18nToggle()" title="Switch to English">🌐 EN</button>
         <button class="btn ghost sm" onclick="logout()">🚪 خروج</button>
       </div>
     </div>
@@ -3718,5 +3719,7 @@ document.getElementById('st-gen').style.display='none';
 FEAS=feasLoad();renderFeas();renderReqList();
 renderMk();renderBz();renderAcc();renderLedger();dgHistory();renderRs();renderReq();renderPeaks();initDesign();renderAgenda();newLetter();renderSecretary();ltRender();renderHome();initAuth();
 </script>
+<!-- ترجمة الواجهة عربي ⇄ إنجليزي (تُحمَّل بعد بناء الصفحة) -->
+<script src="i18n.js"></script>
 </body>
 </html>
